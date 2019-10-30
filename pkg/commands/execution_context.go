@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -1265,6 +1266,10 @@ func (ctx *executionContext) createClusters() error {
 				tasks:     map[string]*testTask{},
 				completed: map[string]*testTask{},
 			}
+			testsPerInstance := int(math.Min(float64(ctx.cloudTestConfig.TestsPerClusterInstance), 20))
+			// initial value of cl.Instances is treated as allowed maximum
+			cl.Instances = int(math.Ceil(math.Min(float64(testCount)/float64(testsPerInstance), float64(cl.Instances))))
+			logrus.Infof("Creating %d instances of '%s' cluster to run %d test(s)", cl.Instances, cl.Name, testCount)
 			for i := 0; i < cl.Instances; i++ {
 				cluster, err := provider.CreateCluster(cl, ctx.factory, ctx.manager, ctx.arguments.instanceOptions)
 				if err != nil {

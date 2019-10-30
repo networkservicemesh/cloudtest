@@ -111,6 +111,8 @@ type CloudTestConfig struct {
 
 	ShuffleTests bool     `yaml:"shuffle-enabled"` // Shuffle tests before assignment
 	OnlyRun      []string `yaml:"only-run"`        // If non-empty, only run the listed tests
+
+	TestsPerClusterInstance int `yaml:"tests-per-cluster-instance"` // Number of tests per cluster instance
 }
 
 // NewCloudTestConfig - creates a test config with some default values specified.
