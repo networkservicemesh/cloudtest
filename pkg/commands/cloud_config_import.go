@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -69,14 +70,15 @@ type clusterOperationRecord struct {
 }
 
 type clusterInstance struct {
-	instance      providers.ClusterInstance
-	state         clusterState
-	group         *clustersGroup
-	startCount    int
-	id            string
-	taskCancel    context.CancelFunc
-	cancelMonitor context.CancelFunc
-	startTime     time.Time
+	runningExecution *config.Execution
+	instance         providers.ClusterInstance
+	state            clusterState
+	group            *clustersGroup
+	startCount       int
+	id               string
+	taskCancel       context.CancelFunc
+	cancelMonitor    context.CancelFunc
+	startTime        time.Time
 
 	currentTask string
 
@@ -170,11 +172,35 @@ func CloudTestRun(cmd *cloudTestCmd) {
 
 func performImport(testConfig *config.CloudTestConfig) error {
 	for _, imp := range testConfig.Imports {
+		if strings.HasSuffix(imp, "*") {
+			dir := imp[:len(imp)-1]
+			files, err := ioutil.ReadDir(dir)
+			if err != nil {
+				return err
+			}
+			var fileNames []string
+			for _, f := range files {
+				fileNames = append(fileNames, filepath.Join(dir, f.Name()))
+			}
+			if err := importFiles(testConfig, fileNames...); err != nil {
+				return err
+			}
+		} else {
+			if err := importFiles(testConfig, imp); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func importFiles(testConfig *config.CloudTestConfig, files ...string) error {
+	for _, f := range files {
 		importConfig := &config.CloudTestConfig{}
 
-		configFileContent, err := ioutil.ReadFile(imp)
+		configFileContent, err := ioutil.ReadFile(f)
 		if err != nil {
-			logrus.Errorf("аailed to read config file %v", err)
+			logrus.Errorf("failed to read config file %v", err)
 			return err
 		}
 		if err = parseConfig(importConfig, configFileContent); err != nil {
@@ -334,47 +360,44 @@ func (ctx *executionContext) pollEvents(c context.Context, osCh <-chan os.Signal
 }
 
 func (ctx *executionContext) assignTasks() {
-	if len(ctx.tasks) > 0 {
-		// Lets check if we have cluster required and start it
-		// Check if we have cluster we could assign.
-		newTasks := []*testTask{}
-
-		tasks := ctx.tasks
-
-		if ctx.cloudTestConfig.ShuffleTests {
-			rand.Seed(time.Now().UnixNano())
-			rand.Shuffle(len(tasks), func(i, j int) { tasks[i], tasks[j] = tasks[j], tasks[i] })
-		}
-		for _, task := range tasks {
-			if task.test.Status == model.StatusSkipped {
-				logrus.Infof("Ignoring skipped task:  %s", task.test.Name)
-				continue
-			}
-
-			assignedClusters, unavailableClusters := ctx.selectClustersForTask(task)
-			if len(unavailableClusters) > 0 {
-				ctx.skipTaskDueUnavailableClusters(task, unavailableClusters)
-				continue
-			}
-
-			canRun := len(assignedClusters) == len(task.clusters)
-			if canRun {
-				// Start task execution.
-				err := ctx.startTask(task, assignedClusters)
-				if err != nil {
-					logrus.Errorf("Error starting task  %s on %s: %v", task.test.Name, task.clusterTaskID, err)
-					canRun = false
-				} else {
-					ctx.running[task.taskID] = task
-				}
-			}
-			if !canRun {
-				// schedule the task for next assignment round
-				newTasks = append(newTasks, task)
-			}
-		}
-		ctx.tasks = newTasks
+	if len(ctx.tasks) == 0 {
+		return
 	}
+	// Lets check if we have cluster required and start it
+	// Check if we have cluster we could assign.
+	newTasks := []*testTask{}
+
+	tasks := ctx.tasks
+
+	for _, task := range tasks {
+		if task.test.Status == model.StatusSkipped {
+			logrus.Infof("Ignoring skipped task:  %s", task.test.Name)
+			continue
+		}
+
+		assignedClusters, unavailableClusters := ctx.selectClustersForTask(task)
+		if len(unavailableClusters) > 0 {
+			ctx.skipTaskDueUnavailableClusters(task, unavailableClusters)
+			continue
+		}
+
+		canRun := len(assignedClusters) == len(task.clusters)
+		if canRun {
+			// Start task execution.
+			err := ctx.startTask(task, assignedClusters)
+			if err != nil {
+				logrus.Errorf("Error starting task  %s on %s: %v", task.test.Name, task.clusterTaskID, err)
+				canRun = false
+			} else {
+				ctx.running[task.taskID] = task
+			}
+		}
+		if !canRun {
+			// schedule the task for next assignment round
+			newTasks = append(newTasks, task)
+		}
+	}
+	ctx.tasks = newTasks
 }
 
 func (ctx *executionContext) skipTaskDueUnavailableClusters(task *testTask, unavailableClusters []*clustersGroup) {
@@ -417,6 +440,10 @@ func (ctx *executionContext) processTaskUpdate(event operationEvent) {
 			event.task.clusterTaskID,
 			statusName(event.task.test.Status),
 			event.task.test.Duration.Round(time.Second))
+
+		for i := 0; i < len(event.task.test.ArtifactDirectories)-2; i++ {
+			_ = os.Remove(event.task.test.ArtifactDirectories[i])
+		}
 
 		for ind, cl := range event.task.clusters {
 			delete(cl.tasks, event.task.test.Key)
@@ -749,13 +776,13 @@ func (ctx *executionContext) startTask(task *testTask, instances []*clusterInsta
 	}
 
 	task.clusterTaskID = makeTaskClusterID(instances)
-
+	task.test.ArtifactDirectories = append(task.test.ArtifactDirectories, ctx.manager.AddFolder(task.clusterTaskID, task.test.Name))
 	fileName, file, err := ctx.manager.OpenFileTest(task.clusterTaskID, task.test.Name, "run")
 	if err != nil {
 		return err
 	}
 
-	clusterConfigs := []string{}
+	var clusterConfigs []string
 
 	for _, inst := range instances {
 		var clusterConfig string
@@ -813,7 +840,7 @@ func (ctx *executionContext) executeTask(task *testTask, clusterConfigs []string
 		}
 
 		st := time.Now()
-		env := []string{}
+		var env []string
 
 		// Fill Kubernetes environment variables.
 		if len(task.test.ExecutionConfig.KubernetesEnv) > 0 {
@@ -831,7 +858,6 @@ func (ctx *executionContext) executeTask(task *testTask, clusterConfigs []string
 		}
 
 		writer := bufio.NewWriter(file)
-
 		msg := fmt.Sprintf("Starting %s on %v\n", task.test.Name, task.clusterTaskID)
 		logrus.Info(msg)
 		_, _ = writer.WriteString(msg)
@@ -845,6 +871,36 @@ func (ctx *executionContext) executeTask(task *testTask, clusterConfigs []string
 		ctx.Lock()
 		for _, inst := range instances {
 			inst.taskCancel = cancel
+			if task != nil && task.test != nil && inst.runningExecution != task.test.ExecutionConfig {
+				if inst.runningExecution != nil {
+					for _, cfg := range clusterConfigs {
+						err = ctx.handleScript(&runScriptArgs{
+							Name:          "After",
+							ClusterTaskId: task.clusterTaskID,
+							Script:        inst.runningExecution.After,
+							Env:           append(inst.runningExecution.Env, fmt.Sprintf("KUBECONFIG=%v", cfg)),
+							Out:           writer,
+						})
+						if err != nil {
+							logrus.Warnf("An error during run After script for execution: %v, error: %v", task.test.ExecutionConfig.Name, err)
+						}
+					}
+				}
+				inst.runningExecution = task.test.ExecutionConfig
+				for _, cfg := range clusterConfigs {
+					err = ctx.handleScript(&runScriptArgs{
+						Name:          "Before",
+						ClusterTaskId: task.clusterTaskID,
+						Script:        task.test.ExecutionConfig.Before,
+						Env:           append(task.test.ExecutionConfig.Env, fmt.Sprintf("KUBECONFIG=%v", cfg)),
+						Out:           writer,
+					})
+					if err != nil {
+						logrus.Warnf("An error during run Before script for execution: %v, error: %v", task.test.ExecutionConfig.Name, err)
+					}
+				}
+
+			}
 		}
 		task.test.Started = time.Now()
 		ctx.Unlock()
@@ -861,10 +917,17 @@ func (ctx *executionContext) executeTask(task *testTask, clusterConfigs []string
 				_, _ = writer.WriteString(msg + "\n")
 				_ = writer.Flush()
 
-				onFailErr := ctx.handleOnFailTask(task, []string{fmt.Sprintf("KUBECONFIG=%s", cfg)}, writer)
+				onFailErr := ctx.handleScript(&runScriptArgs{
+					Name:          "OnFail",
+					ClusterTaskId: task.clusterTaskID,
+					Script:        task.test.ExecutionConfig.OnFail,
+					Env:           append(task.test.ExecutionConfig.Env, fmt.Sprintf("KUBECONFIG=%v", cfg)),
+					Out:           writer,
+				})
 				if onFailErr != nil {
 					errCode = errors.Wrap(errCode, onFailErr.Error())
 				}
+
 			}
 		}
 
@@ -962,48 +1025,6 @@ func (ctx *executionContext) matchRestartRequest(fileName string) bool {
 		}
 	}
 	return false
-}
-
-func (ctx *executionContext) handleOnFailTask(task *testTask, env []string, writer *bufio.Writer) error {
-	config := task.test.ExecutionConfig
-	if config == nil {
-		logrus.Warnf("%s OnFail: no execution config", task.test.Name)
-		return nil
-	}
-	if strings.TrimSpace(config.OnFail) == "" {
-		logrus.Infof("%s OnFail: not provided OnFail script for config %v", task.test.Name, config.Name)
-		return nil
-	}
-	mgr := shell_mgr.NewEnvironmentManager()
-	if err := mgr.ProcessEnvironment(task.clusterTaskID, "shellrun", os.TempDir(), append(env, config.Env...), nil); err != nil {
-		logrus.Errorf("%s OnFail: an error during process env: %v", task.test.Name, err)
-		return err
-	}
-	timeout := ctx.getTestTimeout(task)
-	context, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	return runOnFailScript(context, config.OnFail, mgr.GetProcessedEnv(), writer)
-}
-
-func runOnFailScript(ctx context.Context, script string, env []string, writer *bufio.Writer) error {
-	logger := func(s string) {
-	}
-	root, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	var errs []string
-	for _, cmd := range utils.ParseScript(script) {
-		_, err := utils.RunCommand(ctx, cmd, root, logger, writer, env, map[string]string{}, false)
-		if err != nil {
-			logrus.Errorf("OnFail: an error during run cmd: %v, err: %v", cmd, err.Error())
-			errs = append(errs, err.Error())
-		}
-	}
-	if len(errs) > 0 {
-		return errors.WithMessage(errors.New(strings.Join(errs, "\n")), "Error(s) from 'on fail' script")
-	}
-	return nil
 }
 
 func (ctx *executionContext) getTestTimeout(task *testTask) time.Duration {
@@ -1128,7 +1149,6 @@ func (ctx *executionContext) monitorCluster(context context.Context, ci *cluster
 }
 
 func (ctx *executionContext) destroyCluster(ci *clusterInstance, sendUpdate, fork bool) error {
-
 	if ci.state == clusterCrashed || ci.state == clusterNotAvailable || ci.state == clusterShutdown {
 		// It is already destroyed or not available.
 		return nil
@@ -1200,7 +1220,7 @@ func (ctx *executionContext) createClusters() error {
 				logrus.Errorf(msg)
 				return errors.New(msg)
 			}
-			instances := []*clusterInstance{}
+			var instances []*clusterInstance
 			group := &clustersGroup{
 				provider:  provider,
 				config:    cl,
@@ -1247,8 +1267,20 @@ func (ctx *executionContext) cleanupClusters(cleanupCtx context.Context) {
 	}
 }
 
+func (ctx *executionContext) appendTests(tests ...*model.TestEntry) {
+	if len(tests) < 0 {
+		return
+	}
+	if ctx.cloudTestConfig.ShuffleTests {
+		rand.Seed(time.Now().UnixNano())
+		rand.Shuffle(len(tests), func(i, j int) { tests[i], tests[j] = tests[j], tests[i] })
+	}
+	ctx.tests = append(ctx.tests, tests...)
+}
+
 func (ctx *executionContext) findTests() error {
 	logrus.Infof("Finding tests")
+
 	for _, exec := range ctx.cloudTestConfig.Executions {
 		if exec.Name == "" {
 			return errors.New("execution name should be specified")
@@ -1258,14 +1290,10 @@ func (ctx *executionContext) findTests() error {
 			if err != nil {
 				return err
 			}
-			if len(tests) > 0 {
-				ctx.tests = append(ctx.tests, tests...)
-			}
+			ctx.appendTests(tests...)
 		} else if exec.Kind == "shell" {
 			tests := ctx.findShellTest(exec)
-			if len(tests) > 0 {
-				ctx.tests = append(ctx.tests, tests...)
-			}
+			ctx.appendTests(tests...)
 		} else {
 			return errors.Errorf("unknown executon kind %v", exec.Kind)
 		}
@@ -1278,7 +1306,7 @@ func (ctx *executionContext) findTests() error {
 	return nil
 }
 
-func (ctx *executionContext) findShellTest(exec *config.ExecutionConfig) []*model.TestEntry {
+func (ctx *executionContext) findShellTest(exec *config.Execution) []*model.TestEntry {
 	return []*model.TestEntry{
 		{
 			Name:            exec.Name,
@@ -1291,16 +1319,16 @@ func (ctx *executionContext) findShellTest(exec *config.ExecutionConfig) []*mode
 	}
 }
 
-func (ctx *executionContext) findGoTest(executionConfig *config.ExecutionConfig) ([]*model.TestEntry, error) {
+func (ctx *executionContext) findGoTest(executionConfig *config.Execution) ([]*model.TestEntry, error) {
 	st := time.Now()
-	logrus.Infof("Starting finding tests by tags %v", executionConfig.Tags)
-	execTests, err := model.GetTestConfiguration(ctx.manager, executionConfig.PackageRoot, executionConfig.Tags)
+	logrus.Infof("Starting finding tests by source %v", executionConfig.Source)
+	execTests, err := model.GetTestConfiguration(ctx.manager, executionConfig.PackageRoot, executionConfig.Source)
 	if err != nil {
 		logrus.Errorf("Failed during test lookup %v", err)
 		return nil, err
 	}
 	logrus.Infof("Tests found: %v Elapsed: %v", len(execTests), time.Since(st))
-	result := []*model.TestEntry{}
+	var result []*model.TestEntry
 	for _, t := range execTests {
 		t.Kind = model.TestEntryKindGoTest
 		t.ExecutionConfig = executionConfig
@@ -1499,6 +1527,42 @@ func (ctx *executionContext) checkClustersUsage() {
 
 func (ctx *executionContext) isClusterDown(inst *clusterInstance) bool {
 	return inst.state == clusterShutdown || inst.state == clusterCrashed || inst.state == clusterNotAvailable
+}
+
+func (ctx *executionContext) handleScript(args *runScriptArgs) error {
+	if strings.TrimSpace(args.Script) == "" {
+		logrus.Warnf("%v is empty script. Nothing to run", args.Name)
+		return nil
+	}
+	mgr := shell_mgr.NewEnvironmentManager()
+	if err := mgr.ProcessEnvironment(args.ClusterTaskId, "shellrun", os.TempDir(), args.Env, map[string]string{"test-name": args.Name}); err != nil {
+		logrus.Errorf("%sv: an error during process env: %v", args.Name, err)
+		return err
+	}
+	context, cancel := context.WithTimeout(context.Background(), runScriptTimeout)
+	defer cancel()
+	return runScript(context, args.Name, args.Script, mgr.GetProcessedEnv(), args.Out)
+}
+
+func runScript(ctx context.Context, name, script string, env []string, writer *bufio.Writer) error {
+	logger := func(s string) {
+	}
+	root, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	var errs []string
+	for _, cmd := range utils.ParseScript(script) {
+		_, err := utils.RunCommand(ctx, cmd, root, logger, writer, env, nil, false)
+		if err != nil {
+			logrus.Errorf("An error during run cmd: %v, err: %v", cmd, err.Error())
+			errs = append(errs, err.Error())
+		}
+	}
+	if len(errs) > 0 {
+		return errors.WithMessage(errors.New(strings.Join(errs, "\n")), fmt.Sprintf("Error(s) from '%v' script", name))
+	}
+	return nil
 }
 
 func createClusterProviders(manager execmanager.ExecutionManager) (map[string]providers.ClusterProvider, error) {

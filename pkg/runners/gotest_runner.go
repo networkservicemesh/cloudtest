@@ -13,16 +13,17 @@ import (
 )
 
 type goTestRunner struct {
-	test    *model.TestEntry
-	cmdLine string
-	envMgr  shell.EnvironmentManager
+	test        *model.TestEntry
+	cmdLine     string
+	envMgr      shell.EnvironmentManager
+	artifactDir string
 }
 
 func (runner *goTestRunner) Run(timeoutCtx context.Context, env []string, writer *bufio.Writer) error {
 	logger := func(s string) {}
 	cmdEnv := append(runner.envMgr.GetProcessedEnv(), env...)
 	_, err := utils.RunCommand(timeoutCtx, runner.cmdLine, runner.test.ExecutionConfig.PackageRoot,
-		logger, writer, cmdEnv, map[string]string{}, false)
+		logger, writer, cmdEnv, map[string]string{"artifact-dir": runner.artifactDir}, false)
 	return err
 }
 
@@ -37,10 +38,14 @@ func NewGoTestRunner(ids string, test *model.TestEntry, timeout time.Duration) T
 
 	envMgr := shell.NewEnvironmentManager()
 	_ = envMgr.ProcessEnvironment(ids, "gotest", os.TempDir(), test.ExecutionConfig.Env, map[string]string{})
-
+	artifactDir := ""
+	if len(test.ArtifactDirectories) > 0 {
+		artifactDir = test.ArtifactDirectories[len(test.ArtifactDirectories)-1]
+	}
 	return &goTestRunner{
-		test:    test,
-		cmdLine: cmdLine,
-		envMgr:  envMgr,
+		test:        test,
+		cmdLine:     cmdLine,
+		envMgr:      envMgr,
+		artifactDir: artifactDir,
 	}
 }

@@ -13,9 +13,10 @@ import (
 )
 
 type shellTestRunner struct {
-	test   *model.TestEntry
-	envMgr shell.EnvironmentManager
-	id     string
+	test        *model.TestEntry
+	envMgr      shell.EnvironmentManager
+	artifactDir string
+	id          string
 }
 
 func (runner *shellTestRunner) Run(timeoutCtx context.Context, env []string, writer *bufio.Writer) error {
@@ -35,7 +36,7 @@ func (runner *shellTestRunner) runCmd(context context.Context, script, env []str
 
 		logger := func(s string) {
 		}
-		_, err := utils.RunCommand(context, cmd, "", logger, writer, cmdEnv, map[string]string{}, false)
+		_, err := utils.RunCommand(context, cmd, "", logger, writer, cmdEnv, map[string]string{"artifacts-dir": runner.artifactDir}, false)
 		if err != nil {
 			_, _ = writer.WriteString(fmt.Sprintf("error running command: %v\n", err))
 			_ = writer.Flush()
@@ -53,10 +54,14 @@ func (runner *shellTestRunner) GetCmdLine() string {
 func NewShellTestRunner(ids string, test *model.TestEntry) TestRunner {
 	envMgr := shell.NewEnvironmentManager()
 	_ = envMgr.ProcessEnvironment(ids, "shellrun", os.TempDir(), test.ExecutionConfig.Env, map[string]string{})
-
+	artifactDir := ""
+	if len(test.ArtifactDirectories) > 0 {
+		artifactDir = test.ArtifactDirectories[len(test.ArtifactDirectories)-1]
+	}
 	return &shellTestRunner{
-		id:     ids,
-		test:   test,
-		envMgr: envMgr,
+		id:          ids,
+		test:        test,
+		envMgr:      envMgr,
+		artifactDir: artifactDir,
 	}
 }
