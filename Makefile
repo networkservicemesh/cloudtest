@@ -64,7 +64,6 @@ all: check verify
 
 check:
 	@shellcheck `find . -name "*.sh" -not -path "*vendor/*"`; \
-	yamllint -c .yamllint.yml --strict .
 
 .PHONY: format deps generate install test test-race vet
 #
