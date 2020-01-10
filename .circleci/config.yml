@@ -38,7 +38,7 @@ jobs:
       - run:
           name: Download Go Dependencies
           command: |
-            ./scripts/for-each-module.sh "$(pwd)/scripts/go-mod-download.sh"
+            $(pwd)/scripts/go-mod-download.sh
       - run:
           name: Check code formatting
           command: |
@@ -73,7 +73,7 @@ jobs:
           name: lint
           command: |
             ./scripts/lint-download.sh
-            ./scripts/for-each-module.sh "$(pwd)/scripts/lint-check-diff.sh"
+            $(pwd)/scripts/lint-check-diff.sh
       - run:
           name: license lint
           command: |
