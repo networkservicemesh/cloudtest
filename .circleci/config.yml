@@ -34,11 +34,6 @@ jobs:
           name: Run Error Usage Check
           command: ./scripts/check_errors.sh
       - skip_on_pattern
-      - run:
-          command: |
-            sudo apt-get install python-pip python3-pkg-resources
-            pip install --user yamllint
-      - run: yamllint -c .yamllint.yml --strict .
       - run: go version
       - run:
           name: Download Go Dependencies
