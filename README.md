@@ -22,7 +22,7 @@ For more information, have a look at our detailed overview of NSM - [What is Clo
 
 ## Install
 
-Download a binary from releases, or from source with `go get github.com/networkservicemesh/cloudtest`.
+Install using `go get github.com/networkservicemesh/cloudtest`.
 
 ## Docs
 

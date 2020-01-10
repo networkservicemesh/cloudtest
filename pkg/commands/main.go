@@ -18,7 +18,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
-	
+
 	"github.com/networkservicemesh/cloudtest/pkg/config"
 	"github.com/networkservicemesh/cloudtest/pkg/execmanager"
 	"github.com/networkservicemesh/cloudtest/pkg/k8s"

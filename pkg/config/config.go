@@ -72,7 +72,7 @@ type CloudTestConfig struct {
 	ConfigRoot string                   `yaml:"root"` // A provider stored configurations root.
 	Reporting  struct {
 		JUnitReportFile string `yaml:"junit-report"` // A junit report file location, relative to test root folder.
-	} `yaml:"reporting"`                                   // A reporting options.
+	} `yaml:"reporting"` // A reporting options.
 	HealthCheck []*HealthCheckConfig `yaml:"health-check"` // Health checks options.
 	Executions  []*ExecutionConfig   `yaml:"executions"`
 	Timeout     int64                `yaml:"timeout"` // Global timeout in seconds

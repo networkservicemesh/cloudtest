@@ -1,0 +1,101 @@
+---
+version: 2.1
+
+commands:
+  skip_on_pattern:
+    description: "Skips running job if the only files in the change match the pattern"
+    parameters:
+      branch:
+        type: string
+        default: origin/master
+    steps:
+      - run:
+          name: "Skips running job if the only files in the change match the pattern"
+          command: |
+            ./.circleci/skip_job_on_pattern.sh << parameters.branch >>
+
+jobs:
+
+# sanity
+  test-sanity-check:
+    resource_class: xlarge
+    working_directory: /go/src/github.com/networkservicemesh/cloudtest
+    docker:
+      - image: circleci/golang:1.13-stretch
+    steps:
+      - checkout
+      - run:
+          name: Install Shellcheck
+          command: ./.circleci/install-shellcheck.sh
+      - run:
+          name: Run Shellcheck
+          command: make check
+      - run:
+          name: Run Error Usage Check
+          command: ./scripts/check_errors.sh
+      - skip_on_pattern
+      - run:
+          command: |
+            sudo apt-get install python-pip python3-pkg-resources
+            pip install --user yamllint
+      - run: yamllint -c .yamllint.yml --strict .
+      - run: go version
+      - run:
+          name: Download Go Dependencies
+          command: |
+            ./scripts/for-each-module.sh "$(pwd)/scripts/go-mod-download.sh"
+      - run:
+          name: Check code formatting
+          command: |
+            make install-formatter
+            make format
+            git diff --exit-code || (echo 'Seems like your Go files are not properly formatted. Run `make format` in your branch and commit the changes.' && exit 1)
+      - run: go generate ./...
+      - run: git diff --exit-code || (echo 'Seems like your generated files are not actual. Run `go generate ./...` for each module in your branch and commit the changes.' && exit 1)
+      - run: make vet
+      - run: go build ./...
+      - run: ./scripts/check_dependencies.sh
+      - run: mkdir -p ~/junit/
+      - run:
+          command: |
+            ./scripts/run_unit_tests.sh
+      - store_test_results:
+          path: ~/junit
+      - store_artifacts:
+          path: ~/junit
+    environment:
+      GO111MODULE: "on"
+
+# code analysis
+  test-static-code-analysis:
+    resource_class: large
+    docker:
+      - image: circleci/golang:1.13-stretch
+    steps:
+      - checkout
+      - skip_on_pattern
+      - run:
+          name: lint
+          command: |
+            ./scripts/lint-download.sh
+            ./scripts/for-each-module.sh "$(pwd)/scripts/lint-check-diff.sh"
+      - run:
+          name: license lint
+          command: |
+            go get github.com/denis-tingajkin/go-header@v0.2.0
+            go-header
+    environment:
+      GO111MODULE: "on"
+      LOG_LEVEL: "error"
+
+
+# workflows
+workflows:
+  version: 2
+  build-and-test:
+    jobs:
+      - test-sanity-check
+      - test-static-code-analysis:
+          name: "test-static-code-analysis"
+          requires:
+            - test-sanity-check

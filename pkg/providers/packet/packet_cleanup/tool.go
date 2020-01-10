@@ -19,10 +19,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/networkservicemesh/cloudtest/pkg/utils"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/networkservicemesh/cloudtest/pkg/utils"
 
 	"github.com/networkservicemesh/cloudtest/pkg/providers/packet/packethelper"
 
