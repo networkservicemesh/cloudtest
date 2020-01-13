@@ -2,6 +2,11 @@ package reporting
 
 import "encoding/xml"
 
+const (
+	// TimeCommentFormat is a format for printing readable time suite comment
+	TimeCommentFormat = "Suite was running for %v"
+)
+
 // JUnitFile - JUnitFile
 type JUnitFile struct {
 	XMLName xml.Name `xml:"testsuites"`
@@ -10,13 +15,21 @@ type JUnitFile struct {
 
 // Suite - Suite
 type Suite struct {
-	XMLName    xml.Name    `xml:"testsuite"`
-	Tests      int         `xml:"tests,attr"`
-	Failures   int         `xml:"failures,attr"`
-	Time       string      `xml:"time,attr"`
-	Name       string      `xml:"name,attr"`
-	Properties []*Property `xml:"properties>property,omitempty"`
-	TestCases  []*TestCase
+	XMLName     xml.Name    `xml:"testsuite"`
+	Tests       int         `xml:"tests,attr"`
+	Failures    int         `xml:"failures,attr"`
+	Time        string      `xml:"time,attr"`
+	Name        string      `xml:"name,attr"`
+	Properties  []*Property `xml:"properties>property,omitempty"`
+	TimeComment string      `xml:",comment"`
+	TestCases   []*TestCase
+	Suites      []*Suite
+}
+
+// SuiteDetails holds additional information about test suite.
+type SuiteDetails struct {
+	XMLName       xml.Name `xml:"details"`
+	FormattedTime string   `xml:"formatted_time,attr"`
 }
 
 // TestCase - TestCase
@@ -25,6 +38,7 @@ type TestCase struct {
 	Classname   string       `xml:"classname,attr"`
 	Name        string       `xml:"name,attr"`
 	Time        string       `xml:"time,attr"`
+	Cluster     string       `xml:"cluster_instance,attr"`
 	SkipMessage *SkipMessage `xml:"skipped,omitempty"`
 	Failure     *Failure     `xml:"failure,omitempty"`
 }
