@@ -176,6 +176,7 @@ func performImport(testConfig *config.CloudTestConfig) error {
 			if err := importFiles(testConfig, imp); err != nil {
 				return err
 			}
+			continue
 		}
 		dir, pattern := filepath.Split(imp)
 		files := utils.GetAllFiles(dir)

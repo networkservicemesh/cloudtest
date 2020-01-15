@@ -45,3 +45,13 @@ func TestImportPattern(t *testing.T) {
 	g.Expect(err).Should(gomega.BeNil())
 	g.Expect(len(testConfig.Executions)).Should(gomega.Equal(1))
 }
+
+func TestSpecificImport(t *testing.T) {
+	g := gomega.NewWithT(t)
+	testConfig := &config.CloudTestConfig{
+		Imports: []string{"samples/execution1.yaml"},
+	}
+	err := performImport(testConfig)
+	g.Expect(err).Should(gomega.BeNil())
+	g.Expect(len(testConfig.Executions)).Should(gomega.Equal(1))
+}
