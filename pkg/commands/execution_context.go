@@ -1349,55 +1349,86 @@ func (ctx *executionContext) findGoTest(executionConfig *config.Execution) ([]*m
 	return result, nil
 }
 
+func buildClusterSuiteName(clusters []*clustersGroup) string {
+	var clusterProviderNames = make([]string, len(clusters))
+	for i := 0; i < len(clusters); i++ {
+		clusterProviderNames[i] = clusters[i].config.Name
+	}
+	return strings.Join(clusterProviderNames, "-")
+}
+
 func (ctx *executionContext) generateJUnitReportFile() (*reporting.JUnitFile, error) {
 	// generate and write report
 	ctx.report = &reporting.JUnitFile{}
 
-	totalFailures := 0
-	for _, cluster := range ctx.clusters {
-		failures := 0
-		totalTests := 0
-		totalTime := time.Duration(0)
-		suite := &reporting.Suite{
-			Name: cluster.config.Name,
-		}
-
-		for _, test := range cluster.tasks {
-			totalTests, totalTime, failures = ctx.generateTestCaseReport(test, totalTests, totalTime, failures, suite)
-		}
-
-		for _, test := range cluster.completed {
-			totalTests, totalTime, failures = ctx.generateTestCaseReport(test, totalTests, totalTime, failures, suite)
-		}
-
-		// Check cluster executions.
-		availableClusters := 0
-		for _, inst := range cluster.instances {
-			if inst.state != clusterNotAvailable {
-				availableClusters++
-			}
-		}
-		if availableClusters == 0 {
-			// No clusters available let's mark this as error.
-			for _, inst := range cluster.instances {
-				if inst.state == clusterNotAvailable {
-					for _, exec := range inst.executions {
-						ctx.generateClusterFailedReportEntry(inst, exec, suite)
-						failures++
-						totalTests++
-						break
-					}
-				}
-			}
-		}
-
-		suite.Tests = totalTests
-		suite.Failures = failures
-		suite.Time = fmt.Sprintf("%v", totalTime)
-		totalFailures += failures
-
-		ctx.report.Suites = append(ctx.report.Suites, suite)
+	summarySuite := &reporting.Suite{
+		Name: "All tests",
 	}
+
+	// We need to group all tests by executions.
+	executionsTests := ctx.getAllTestTasksGroupedByExecutions()
+
+	totalFailures := 0
+	totalTests := 0
+	totalTime := time.Duration(0)
+	// Generate suites by executions.
+	for execName, executionTasks := range executionsTests {
+		execSuite := &reporting.Suite{
+			Name: execName,
+		}
+
+		// Group execution's test tasks by cluster type.
+		clustersTests := make(map[string][]*testTask)
+		for _, test := range executionTasks {
+			clusterGroupName := buildClusterSuiteName(test.clusters)
+			clustersTests[clusterGroupName] = append(clustersTests[clusterGroupName], test)
+		}
+
+		executionFailures := 0
+		executionTests := 0
+		executionTime := time.Duration(0)
+
+		// Generate nested suites by cluster types.
+		for clusterTaskName, tests := range clustersTests {
+			clusterTests, clusterTime, clusterFailures, clusterSuite := ctx.generateReportSuiteByTestTasks(clusterTaskName, tests)
+
+			executionFailures += clusterFailures
+			executionTests += clusterTests
+			executionTime += clusterTime
+
+			clusterSuite.Time = fmt.Sprintf("%v", clusterTime.Seconds())
+			clusterSuite.TimeComment = fmt.Sprintf(reporting.TimeCommentFormat, clusterTime.Round(time.Second))
+			clusterSuite.Failures = clusterFailures
+			clusterSuite.Tests = clusterTests
+			execSuite.Suites = append(execSuite.Suites, clusterSuite)
+		}
+
+		totalFailures += executionFailures
+		totalTests += executionTests
+		totalTime += executionTime
+
+		execSuite.Tests = executionTests
+		execSuite.Failures = executionFailures
+		execSuite.Time = fmt.Sprintf("%v", executionTime.Seconds())
+		execSuite.TimeComment = fmt.Sprintf(reporting.TimeCommentFormat, executionTime.Round(time.Second))
+		summarySuite.Suites = append(summarySuite.Suites, execSuite)
+	}
+
+	// Add a suite with cluster failures.
+	clusterFailuresTime, clusterFailuresCount, clusterFailuresSuite := ctx.generateClusterFailuresReportSuite()
+	if clusterFailuresCount > 0 {
+		totalFailures += clusterFailuresCount
+		totalTime += clusterFailuresTime
+		clusterFailuresSuite.Tests = clusterFailuresCount
+		clusterFailuresSuite.Failures = clusterFailuresCount
+		summarySuite.Suites = append(summarySuite.Suites, clusterFailuresSuite)
+	}
+
+	summarySuite.Time = fmt.Sprintf("%v", totalTime.Seconds())
+	summarySuite.TimeComment = fmt.Sprintf(reporting.TimeCommentFormat, totalTime.Round(time.Second))
+	summarySuite.Failures = totalFailures
+	summarySuite.Tests = totalTests
+	ctx.report.Suites = append(ctx.report.Suites, summarySuite)
 
 	output, err := xml.MarshalIndent(ctx.report, "  ", "    ")
 	if err != nil {
@@ -1412,6 +1443,68 @@ func (ctx *executionContext) generateJUnitReportFile() (*reporting.JUnitFile, er
 	return ctx.report, nil
 }
 
+func (ctx *executionContext) generateClusterFailuresReportSuite() (time.Duration, int, *reporting.Suite) {
+	clusterFailuresSuite := &reporting.Suite{
+		Name: "Cluster failures",
+	}
+
+	clusterFailures := 0
+	failuresTime := time.Duration(0)
+	// Check cluster instances
+	for _, cluster := range ctx.clusters {
+		availableClusters := 0
+		for _, inst := range cluster.instances {
+			if inst.state != clusterNotAvailable {
+				availableClusters++
+			}
+		}
+		if availableClusters == 0 {
+			// No clusters available let's mark this as error.
+			for _, inst := range cluster.instances {
+				if inst.state == clusterNotAvailable {
+					for _, exec := range inst.executions {
+						ctx.generateClusterFailedReportEntry(inst, exec, clusterFailuresSuite)
+						failuresTime += exec.duration
+						clusterFailures++
+						break
+					}
+				}
+			}
+		}
+	}
+	clusterFailuresSuite.Time = fmt.Sprintf("%v", failuresTime.Seconds())
+	clusterFailuresSuite.TimeComment = fmt.Sprintf(reporting.TimeCommentFormat, failuresTime.Round(time.Second))
+	return failuresTime, clusterFailures, clusterFailuresSuite
+}
+
+func (ctx *executionContext) generateReportSuiteByTestTasks(suiteName string, tests []*testTask) (int, time.Duration, int, *reporting.Suite) {
+	failuresCount := 0
+	testsCount := 0
+	time := time.Duration(0)
+	suite := &reporting.Suite{
+		Name: suiteName,
+	}
+	for _, test := range tests {
+		testsCount, time, failuresCount = ctx.generateTestCaseReport(test, testsCount, time, failuresCount, suite)
+	}
+	return testsCount, time, failuresCount, suite
+}
+
+func (ctx *executionContext) getAllTestTasksGroupedByExecutions() map[string][]*testTask {
+	var executionsTests = make(map[string][]*testTask)
+	for _, cluster := range ctx.clusters {
+		for _, test := range cluster.tasks {
+			execName := test.test.ExecutionConfig.Name
+			executionsTests[execName] = append(executionsTests[execName], test)
+		}
+		for _, test := range cluster.completed {
+			execName := test.test.ExecutionConfig.Name
+			executionsTests[execName] = append(executionsTests[execName], test)
+		}
+	}
+	return executionsTests
+}
+
 func (ctx *executionContext) generateClusterFailedReportEntry(inst *clusterInstance, exec *clusterOperationRecord, suite *reporting.Suite) {
 	message := fmt.Sprintf("Cluster start failed %v", inst.id)
 	result := fmt.Sprintf("Error: %v\n", exec.errMsg)
@@ -1424,7 +1517,7 @@ func (ctx *executionContext) generateClusterFailedReportEntry(inst *clusterInsta
 	}
 	startCase := &reporting.TestCase{
 		Name: fmt.Sprintf("Startup-%v", inst.id),
-		Time: fmt.Sprintf("%v", exec.duration),
+		Time: fmt.Sprintf("%v", exec.duration.Seconds()),
 	}
 	startCase.Failure = &reporting.Failure{
 		Type:     "ERROR",
@@ -1436,8 +1529,9 @@ func (ctx *executionContext) generateClusterFailedReportEntry(inst *clusterInsta
 
 func (ctx *executionContext) generateTestCaseReport(test *testTask, totalTests int, totalTime time.Duration, failures int, suite *reporting.Suite) (int, time.Duration, int) {
 	testCase := &reporting.TestCase{
-		Name: test.test.Key,
-		Time: test.test.Duration.String(),
+		Name:    test.test.Name,
+		Time:    fmt.Sprintf("%v", test.test.Duration.Seconds()),
+		Cluster: test.clusterTaskID,
 	}
 
 	switch test.test.Status {

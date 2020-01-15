@@ -66,10 +66,12 @@ func TestRestartRequest(t *testing.T) {
 
 	g.Expect(report).NotTo(BeNil())
 
-	g.Expect(len(report.Suites)).To(Equal(1))
-	g.Expect(report.Suites[0].Failures).To(Equal(1))
-	g.Expect(report.Suites[0].Tests).To(Equal(2))
-	g.Expect(len(report.Suites[0].TestCases)).To(Equal(2))
+	rootSuite := report.Suites[0]
+
+	g.Expect(len(rootSuite.Suites)).To(Equal(1))
+	g.Expect(rootSuite.Suites[0].Failures).To(Equal(1))
+	g.Expect(rootSuite.Suites[0].Tests).To(Equal(2))
+	g.Expect(len(rootSuite.Suites[0].Suites[0].TestCases)).To(Equal(2))
 
 	logKeeper.CheckMessagesOrder(t, []string{
 		"Starting TestRequestRestart",
@@ -120,10 +122,16 @@ func TestRestartRetestDestroyCluster(t *testing.T) {
 
 	g.Expect(report).NotTo(BeNil())
 
-	g.Expect(len(report.Suites)).To(Equal(1))
-	g.Expect(report.Suites[0].Failures).To(Equal(1))
-	g.Expect(report.Suites[0].Tests).To(Equal(3))
-	g.Expect(len(report.Suites[0].TestCases)).To(Equal(3))
+	rootSuite := report.Suites[0]
+	g.Expect(len(rootSuite.Suites)).To(Equal(2))
+
+	g.Expect(rootSuite.Suites[0].Tests).To(Equal(2))
+	g.Expect(rootSuite.Suites[0].Failures).To(Equal(0))
+	g.Expect(len(rootSuite.Suites[0].Suites[0].TestCases)).To(Equal(2))
+
+	g.Expect(rootSuite.Suites[1].Tests).To(Equal(1))
+	g.Expect(rootSuite.Suites[1].Failures).To(Equal(1))
+	g.Expect(len(rootSuite.Suites[1].TestCases)).To(Equal(1))
 
 	logKeeper.CheckMessagesOrder(t, []string{
 		"Starting TestRequestRestart",
@@ -178,10 +186,11 @@ func TestRestartRequestRestartCluster(t *testing.T) {
 
 	g.Expect(report).NotTo(BeNil())
 
-	g.Expect(len(report.Suites)).To(Equal(1))
-	g.Expect(report.Suites[0].Failures).To(Equal(1))
-	g.Expect(report.Suites[0].Tests).To(Equal(2))
-	g.Expect(len(report.Suites[0].TestCases)).To(Equal(2))
+	rootSuite := report.Suites[0]
+	g.Expect(len(rootSuite.Suites)).To(Equal(1))
+	g.Expect(rootSuite.Suites[0].Failures).To(Equal(1))
+	g.Expect(rootSuite.Suites[0].Tests).To(Equal(2))
+	g.Expect(len(rootSuite.Suites[0].Suites[0].TestCases)).To(Equal(2))
 
 	logKeeper.CheckMessagesOrder(t, []string{
 		"Starting TestRequestRestart",
@@ -231,12 +240,13 @@ func TestRestartRequestSkip(t *testing.T) {
 
 	g.Expect(report).NotTo(BeNil())
 
-	g.Expect(len(report.Suites)).To(Equal(1))
-	g.Expect(report.Suites[0].Failures).To(Equal(0))
-	g.Expect(report.Suites[0].Tests).To(Equal(2))
-	g.Expect(len(report.Suites[0].TestCases)).To(Equal(2))
+	rootSuite := report.Suites[0]
+	g.Expect(len(rootSuite.Suites)).To(Equal(1))
+	g.Expect(rootSuite.Suites[0].Failures).To(Equal(0))
+	g.Expect(rootSuite.Suites[0].Tests).To(Equal(2))
+	g.Expect(len(rootSuite.Suites[0].Suites[0].TestCases)).To(Equal(2))
 
-	for _, tt := range report.Suites[0].TestCases {
+	for _, tt := range rootSuite.Suites[0].TestCases {
 		if tt.Name == "_TestRequestRestart" {
 			g.Expect(tt.SkipMessage.Message).To(Equal("Test TestRequestRestart retry count 2 exceed: err: failed to run go test . -test.timeout 50m0s -count 1 --run \"^(TestRequestRestart)\\\\z\" --tags \"request_restart\" --test.v ExitCode: 1"))
 		}

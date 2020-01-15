@@ -42,14 +42,20 @@ func TestClusterInstancesFailed(t *testing.T) {
 
 	g.Expect(report).NotTo(BeNil())
 
-	g.Expect(len(report.Suites)).To(Equal(2))
-	g.Expect(report.Suites[0].Failures).To(Equal(1))
-	g.Expect(report.Suites[0].Tests).To(Equal(3))
-	g.Expect(len(report.Suites[0].TestCases)).To(Equal(3))
+	rootSuite := report.Suites[0]
 
-	g.Expect(report.Suites[1].Failures).To(Equal(2))
-	g.Expect(report.Suites[1].Tests).To(Equal(5))
-	g.Expect(len(report.Suites[1].TestCases)).To(Equal(5))
+	g.Expect(len(rootSuite.Suites)).To(Equal(2))
+
+	g.Expect(len(rootSuite.Suites[0].Suites)).To(Equal(2))
+
+	g.Expect(rootSuite.Suites[0].Failures).To(Equal(1))
+	g.Expect(rootSuite.Suites[0].Tests).To(Equal(6))
+	g.Expect(len(rootSuite.Suites[0].Suites[0].TestCases)).To(Equal(3))
+	g.Expect(len(rootSuite.Suites[0].Suites[1].TestCases)).To(Equal(3))
+
+	g.Expect(rootSuite.Suites[1].Failures).To(Equal(2))
+	g.Expect(rootSuite.Suites[1].Tests).To(Equal(2))
+	g.Expect(len(rootSuite.Suites[1].TestCases)).To(Equal(2))
 
 	// Do assertions
 }
@@ -126,24 +132,32 @@ func TestClusterInstancesOnFailGoRunner(t *testing.T) {
 
 	g.Expect(report).NotTo(BeNil())
 
-	g.Expect(len(report.Suites)).To(Equal(2))
-	g.Expect(report.Suites[0].Failures).To(Equal(1))
-	g.Expect(report.Suites[0].Tests).To(Equal(3))
-	g.Expect(len(report.Suites[0].TestCases)).To(Equal(3))
+	rootSuite := report.Suites[0]
 
-	g.Expect(report.Suites[1].Failures).To(Equal(2))
-	g.Expect(report.Suites[1].Tests).To(Equal(5))
-	g.Expect(len(report.Suites[1].TestCases)).To(Equal(5))
+	g.Expect(len(rootSuite.Suites)).To(Equal(2))
+
+	g.Expect(rootSuite.Suites[0].Failures).To(Equal(1))
+	g.Expect(rootSuite.Suites[0].Tests).To(Equal(6))
+	g.Expect(len(rootSuite.Suites[0].Suites[0].TestCases)).To(Equal(3))
+	g.Expect(len(rootSuite.Suites[0].Suites[1].TestCases)).To(Equal(3))
+
+	g.Expect(rootSuite.Suites[1].Failures).To(Equal(2))
+	g.Expect(rootSuite.Suites[1].Tests).To(Equal(2))
+	g.Expect(len(rootSuite.Suites[1].TestCases)).To(Equal(2))
 
 	foundFailTest := false
 
-	for _, t := range report.Suites[0].TestCases {
-		if t.Name == "_TestFail" {
-			g.Expect(t.Failure).NotTo(Equal(BeNil()))
-			g.Expect(strings.Contains(t.Failure.Contents, ">>>Running on fail script<<<")).To(Equal(true))
-			foundFailTest = true
-		} else {
-			g.Expect(t.Failure).Should(BeNil())
+	for _, execSuite := range rootSuite.Suites[0].Suites {
+		if execSuite.Name == "a_provider" {
+			for _, testCase := range execSuite.TestCases {
+				if testCase.Name == "TestFail" {
+					g.Expect(testCase.Failure).NotTo(BeNil())
+					g.Expect(strings.Contains(testCase.Failure.Contents, ">>>Running on fail script<<<")).To(Equal(true))
+					foundFailTest = true
+				} else {
+					g.Expect(testCase.Failure).Should(BeNil())
+				}
+			}
 		}
 	}
 	g.Expect(foundFailTest).Should(BeTrue())
@@ -182,14 +196,15 @@ func TestClusterInstancesOnFailShellRunner(t *testing.T) {
 	report, err := commands.PerformTesting(testConfig, &testValidationFactory{}, &commands.Arguments{})
 	g.Expect(err.Error()).To(Equal("there is failed tests 1"))
 	foundFailTest := false
-
-	for _, t := range report.Suites[0].TestCases {
-		if t.Name == "_fail" {
-			g.Expect(t.Failure).NotTo(Equal(BeNil()))
-			g.Expect(t.Failure.Contents).Should(ContainSubstring(">>>Running on fail script name=OnFail<<<"))
+	
+	for _, executionSuite := range report.Suites[0].Suites {
+		testCase := executionSuite.Suites[0].TestCases[0]
+		if executionSuite.Name == "fail" {
+			g.Expect(testCase.Failure).NotTo(BeNil())
+			g.Expect(strings.Contains(testCase.Failure.Contents, ">>>Running on fail script name=OnFail<<<")).To(Equal(true))
 			foundFailTest = true
 		} else {
-			g.Expect(t.Failure).Should(BeNil())
+			g.Expect(testCase.Failure).Should(BeNil())
 		}
 	}
 	g.Expect(foundFailTest).Should(BeTrue())
@@ -238,8 +253,9 @@ func TestClusterInstancesOnFailShellRunnerInterdomain(t *testing.T) {
 	g.Expect(err.Error()).To(Equal("there is failed tests 1"))
 	foundFailTest := false
 
-	for _, t := range report.Suites[0].TestCases {
-		if t.Name == "a_provider_b_provider_fail" {
+	for _, suite := range report.Suites[0].Suites {
+		t := suite.Suites[0].TestCases[0]
+		if suite.Name == "fail" {
 			g.Expect(t.Failure).NotTo(Equal(BeNil()))
 			g.Expect(strings.Contains(t.Failure.Contents, ">>>Running on fail script with ./.tests/config.a <<<")).To(Equal(true))
 			g.Expect(strings.Contains(t.Failure.Contents, ">>>Running on fail script with ./.tests/config.b <<<")).To(Equal(true))
