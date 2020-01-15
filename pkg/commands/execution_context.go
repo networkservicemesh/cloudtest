@@ -952,7 +952,10 @@ func (ctx *executionContext) executeTask(task *testTask, clusterConfigs []string
 			if err != nil {
 				logrus.Errorf("Task failed because cluster is not valid: %v %v %v", task.test.Name, inst.id, err)
 				clusterNotAvailable = true
-				ctx.destroyCluster(inst, true, false)
+				destroyErr := ctx.destroyCluster(inst, true, false)
+				if destroyErr != nil {
+					logrus.Errorf("An error during destroy cluster: %v", destroyErr)
+				}
 			}
 			ctx.Lock()
 			inst.taskCancel = nil

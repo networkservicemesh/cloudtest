@@ -82,9 +82,7 @@ func GetTestConfiguration(manager execmanager.ExecutionManager, root string, sou
 			return nil, err
 		}
 		for key := range allTests {
-			if _, ok := tests[key]; ok {
-				delete(tests, key)
-			}
+			delete(tests, key)
 		}
 		return tests, nil
 	} else if len(source.Tests) > 0 {

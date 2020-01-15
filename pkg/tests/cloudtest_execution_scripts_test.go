@@ -77,7 +77,7 @@ func TestAfterWorksCorrectly(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &testValidationFactory{}, &commands.Arguments{})
-
+	g.Expect(err).Should(BeNil())
 	g.Expect(report).NotTo(BeNil())
 
 	path := path.Join(tmpDir, provider.Name+"-1", "006-test2-run.log")
@@ -134,7 +134,7 @@ func TestBeforeWorksCorrectly(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &testValidationFactory{}, &commands.Arguments{})
-
+	g.Expect(err).Should(BeNil())
 	g.Expect(report).NotTo(BeNil())
 
 	path := path.Join(tmpDir, provider.Name+"-1", "005-test1-run.log")
