@@ -17,9 +17,10 @@
 package commands
 
 import (
-	"github.com/networkservicemesh/cloudtest/pkg/config"
 	"io/ioutil"
 	"testing"
+
+	"github.com/networkservicemesh/cloudtest/pkg/config"
 
 	"github.com/onsi/gomega"
 )

@@ -2,12 +2,13 @@ package utils
 
 import (
 	"bufio"
-	"github.com/sirupsen/logrus"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 //GetAllFiles returns all files in dir

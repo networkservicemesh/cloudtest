@@ -17,13 +17,14 @@
 package tests
 
 import (
-	"github.com/networkservicemesh/cloudtest/pkg/commands"
-	"github.com/networkservicemesh/cloudtest/pkg/config"
-	"github.com/networkservicemesh/cloudtest/pkg/utils"
 	"io/ioutil"
 	"os"
 	"path"
 	"testing"
+
+	"github.com/networkservicemesh/cloudtest/pkg/commands"
+	"github.com/networkservicemesh/cloudtest/pkg/config"
+	"github.com/networkservicemesh/cloudtest/pkg/utils"
 
 	. "github.com/onsi/gomega"
 )
