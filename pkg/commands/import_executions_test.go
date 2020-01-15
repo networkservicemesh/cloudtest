@@ -22,16 +22,25 @@ import (
 	"testing"
 
 	"github.com/onsi/gomega"
-
 )
 
-func TestImport(t *testing.T) {
+func TestImportAll(t *testing.T) {
 	g := gomega.NewWithT(t)
 	testConfig := &config.CloudTestConfig{
-		Imports: []string{"samples/*"},
+		Imports: []string{"samples/.*"},
 	}
 	err := performImport(testConfig)
 	g.Expect(err).Should(gomega.BeNil())
 	files, _ := ioutil.ReadDir(testConfig.Imports[0][:len(testConfig.Imports[0])-1])
 	g.Expect(len(testConfig.Executions) == len(files)).Should(gomega.BeTrue())
+}
+
+func TestImportPattern(t *testing.T) {
+	g := gomega.NewWithT(t)
+	testConfig := &config.CloudTestConfig{
+		Imports: []string{"samples/.*2"},
+	}
+	err := performImport(testConfig)
+	g.Expect(err).Should(gomega.BeNil())
+	g.Expect(len(testConfig.Executions)).Should(gomega.Equal(1))
 }
