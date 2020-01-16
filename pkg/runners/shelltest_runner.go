@@ -31,12 +31,13 @@ func (runner *shellTestRunner) runCmd(context context.Context, script, env []str
 		}
 
 		cmdEnv := append(runner.envMgr.GetProcessedEnv(), env...)
+		cmdEnv = append(cmdEnv, "ARTIFACTS_DIR="+runner.artifactDir)
 		_, _ = writer.WriteString(fmt.Sprintf(">>>>>>Running: %s:<<<<<<\n", cmd))
 		_ = writer.Flush()
 
 		logger := func(s string) {
 		}
-		_, err := utils.RunCommand(context, cmd, "", logger, writer, cmdEnv, map[string]string{"artifacts-dir": runner.artifactDir}, false)
+		_, err := utils.RunCommand(context, cmd, "", logger, writer, cmdEnv, nil, false)
 		if err != nil {
 			_, _ = writer.WriteString(fmt.Sprintf("error running command: %v\n", err))
 			_ = writer.Flush()

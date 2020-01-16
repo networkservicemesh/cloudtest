@@ -22,8 +22,9 @@ type goTestRunner struct {
 func (runner *goTestRunner) Run(timeoutCtx context.Context, env []string, writer *bufio.Writer) error {
 	logger := func(s string) {}
 	cmdEnv := append(runner.envMgr.GetProcessedEnv(), env...)
+	cmdEnv = append(cmdEnv, "ARTIFACTS_DIR="+runner.artifactDir)
 	_, err := utils.RunCommand(timeoutCtx, runner.cmdLine, runner.test.ExecutionConfig.PackageRoot,
-		logger, writer, cmdEnv, map[string]string{"artifact-dir": runner.artifactDir}, false)
+		logger, writer, cmdEnv, nil, false)
 	return err
 }
 
