@@ -3,20 +3,23 @@ module github.com/networkservicemesh/cloudtest
 go 1.13
 
 require (
+	github.com/denis-tingajkin/go-header v0.2.0 // indirect
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/uuid v1.1.1
 	github.com/onsi/gomega v1.7.0
 	github.com/packethost/packngo v0.2.0
-	github.com/pkg/errors v0.8.1
+	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/viper v1.5.0
-	gopkg.in/yaml.v2 v2.2.4
+	golang.org/x/sys v0.0.0-20200117145432-59e60aa80a0c // indirect
+	gopkg.in/yaml.v2 v2.2.7
 	k8s.io/api v0.0.0
-	k8s.io/apimachinery v0.0.0
+	k8s.io/apimachinery v0.17.1
 	k8s.io/client-go v11.0.0+incompatible
 	k8s.io/kubernetes v1.16.3
+	sigs.k8s.io/kind v0.7.1-0.20200117035255-aec4d1c38da3 // indirect
 )
 
 replace (
