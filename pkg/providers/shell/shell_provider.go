@@ -130,14 +130,14 @@ func (si *shellInstance) Start(timeout time.Duration) (string, error) {
 	}
 
 	if si.configLocation == "" {
-		var output []string
-		output, err = utils.ExecRead(context, "", strings.Split(si.configScript, " "))
+		var output string
+		output, err := si.shellInterface.RunRead(context, "config", []string{si.configScript}, nil)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to retrieve configuration location %v", err)
 			logrus.Errorf(msg)
 			return "", err
 		}
-		si.configLocation = output[0]
+		si.configLocation = strings.TrimSpace(output)
 	}
 	si.validator, err = si.factory.CreateValidator(si.config, si.configLocation)
 	if err != nil {
