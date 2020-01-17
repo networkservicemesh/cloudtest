@@ -55,6 +55,7 @@ func (em *environmentManager) GetConfigLocation() string {
 func (em *environmentManager) ProcessEnvironment(clusterID, providerName, tempDir string, env []string, extraArgs map[string]string) error {
 	environment := map[string]string{}
 
+	em.processedEnv = []string{}
 	for _, k := range os.Environ() {
 		key, value, err := utils.ParseVariable(k)
 		if err != nil {
