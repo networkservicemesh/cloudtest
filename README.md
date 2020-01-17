@@ -28,6 +28,10 @@ Install using `go get github.com/networkservicemesh/cloudtest`.
 
 See our full documentation at the [docs](/docs/README.md) folder.
 
+## Examples
+
+[CloudTest with Kind provider example](./examples/kind/README.md) 
+
 ## Get involved
 
 All community are live here: [NetworkServiceMesh](https://github.com/networkservicemesh/networkservicemesh)

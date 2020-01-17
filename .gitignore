@@ -30,3 +30,4 @@ containers.txt
 
 # Miscellaneous build artifacts
 build/dist
+/examples/kind/.results/
