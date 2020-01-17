@@ -1,0 +1,7 @@
+---
+executions:
+  - name: "Execution2"
+    kind: shell
+    timeout: 300
+    run: |
+      echo Execution1

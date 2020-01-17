@@ -4,10 +4,31 @@ import (
 	"bufio"
 	"os"
 	"path"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 )
+
+//GetAllFiles returns all files in dir
+func GetAllFiles(dir string) []string {
+	var files []string
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if info == nil {
+			return nil
+		}
+		if !info.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		logrus.Errorf("An error during scanning dir: %v. Error: %v", dir, err.Error())
+		return nil
+	}
+	return files
+}
 
 // OpenFile - opens a file in folder and make folder parents if required.
 func OpenFile(root, fileName string) (string, *os.File, error) {
@@ -43,6 +64,20 @@ func ReadFile(fileName string) ([]string, error) {
 		output = append(output, strings.TrimSpace(s))
 	}
 	return output, nil
+}
+
+func FilterByPattern(source []string, pattern string) ([]string, error) {
+	p, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+	var result []string
+	for _, s := range source {
+		if p.MatchString(s) {
+			result = append(result, s)
+		}
+	}
+	return result, nil
 }
 
 // WriteFile - write content to file inside folder

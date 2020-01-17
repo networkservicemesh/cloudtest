@@ -24,6 +24,8 @@ type ExecutionManager interface {
 	GetRoot(root string) (string, error)
 	//AddFile - set named file to content.
 	AddFile(fileName string, bytes []byte)
+	//AddFolder creates specific folder
+	AddFolder(category, name string) string
 }
 
 type executionManagerImpl struct {
@@ -71,9 +73,16 @@ func (mgr *executionManagerImpl) OpenFile(category, operationName string) (strin
 	cat := mgr.getCategory(category)
 	return utils.OpenFile(path.Join(mgr.root, category), fmt.Sprintf("%s-%s.log", cat, operationName))
 }
+
 func (mgr *executionManagerImpl) OpenFileTest(category, testName, operation string) (string, *os.File, error) {
 	cat := mgr.getCategory(category)
 	return utils.OpenFile(path.Join(mgr.root, category), fmt.Sprintf("%s-%s-%s.log", cat, testName, operation))
+}
+
+func (mgr *executionManagerImpl) AddFolder(category, name string) string {
+	result := path.Join(mgr.root, category, name)
+	_ = os.MkdirAll(result, os.ModePerm)
+	return result
 }
 
 func (mgr *executionManagerImpl) AddLog(category, operationName, content string) {

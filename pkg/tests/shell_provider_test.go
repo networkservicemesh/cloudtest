@@ -59,16 +59,18 @@ func TestShellProvider(t *testing.T) {
 	createProvider(testConfig, "a_provider")
 	createProvider(testConfig, "b_provider")
 
-	testConfig.Executions = append(testConfig.Executions, &config.ExecutionConfig{
+	testConfig.Executions = append(testConfig.Executions, &config.Execution{
 		Name:        "simple",
 		Timeout:     15,
 		PackageRoot: "./sample",
 	})
 
-	testConfig.Executions = append(testConfig.Executions, &config.ExecutionConfig{
-		Name:        "simple_tagged",
-		Timeout:     15,
-		Tags:        []string{"basic"},
+	testConfig.Executions = append(testConfig.Executions, &config.Execution{
+		Name:    "simple_tagged",
+		Timeout: 15,
+		Source: config.ExecutionSource{
+			Tags: []string{"basic"},
+		},
 		PackageRoot: "./sample",
 	})
 
@@ -132,7 +134,7 @@ func TestInvalidProvider(t *testing.T) {
 	createProvider(testConfig, "a_provider")
 	delete(testConfig.Providers[0].Scripts, "start")
 
-	testConfig.Executions = append(testConfig.Executions, &config.ExecutionConfig{
+	testConfig.Executions = append(testConfig.Executions, &config.Execution{
 		Name:        "simple",
 		Timeout:     2,
 		PackageRoot: "./sample",
@@ -165,7 +167,7 @@ func TestRequireEnvVars(t *testing.T) {
 		"KUBECONFIG", "QWE",
 	}...)
 
-	testConfig.Executions = append(testConfig.Executions, &config.ExecutionConfig{
+	testConfig.Executions = append(testConfig.Executions, &config.Execution{
 		Name:        "simple",
 		Timeout:     2,
 		PackageRoot: "./sample",
@@ -215,7 +217,7 @@ func TestRequireEnvVars_DEPS(t *testing.T) {
 		"TF_LOG=DEBUG",
 	}...)
 
-	testConfig.Executions = append(testConfig.Executions, &config.ExecutionConfig{
+	testConfig.Executions = append(testConfig.Executions, &config.Execution{
 		Name:        "simple",
 		Timeout:     2,
 		PackageRoot: "./sample",
@@ -243,13 +245,13 @@ func TestShellProviderShellTest(t *testing.T) {
 	createProvider(testConfig, "a_provider")
 	createProvider(testConfig, "b_provider")
 
-	testConfig.Executions = append(testConfig.Executions, &config.ExecutionConfig{
+	testConfig.Executions = append(testConfig.Executions, &config.Execution{
 		Name:        "simple",
 		Timeout:     15,
 		PackageRoot: "./sample",
 	})
 
-	testConfig.Executions = append(testConfig.Executions, &config.ExecutionConfig{
+	testConfig.Executions = append(testConfig.Executions, &config.Execution{
 		Name:    "simple_shell",
 		Timeout: 150000,
 		Kind:    "shell",
@@ -260,7 +262,7 @@ func TestShellProviderShellTest(t *testing.T) {
 		}, "\n"),
 	})
 
-	testConfig.Executions = append(testConfig.Executions, &config.ExecutionConfig{
+	testConfig.Executions = append(testConfig.Executions, &config.Execution{
 		Name:    "simple_shell_fail",
 		Timeout: 15,
 		Kind:    "shell",
@@ -322,17 +324,19 @@ func TestUnusedClusterShutdownByMonitor(t *testing.T) {
 	p2 := createProvider(testConfig, "b_provider")
 	p2.TestDelay = 7
 
-	testConfig.Executions = append(testConfig.Executions, &config.ExecutionConfig{
+	testConfig.Executions = append(testConfig.Executions, &config.Execution{
 		Name:            "simple",
 		Timeout:         15,
 		PackageRoot:     "./sample",
 		ClusterSelector: []string{"a_provider"},
 	})
 
-	testConfig.Executions = append(testConfig.Executions, &config.ExecutionConfig{
-		Name:            "simple2",
-		Timeout:         15,
-		Tags:            []string{"basic"},
+	testConfig.Executions = append(testConfig.Executions, &config.Execution{
+		Name:    "simple2",
+		Timeout: 15,
+		Source: config.ExecutionSource{
+			Tags: []string{"basic"},
+		},
 		PackageRoot:     "./sample",
 		ClusterSelector: []string{"b_provider"},
 	})
@@ -385,26 +389,30 @@ func TestMultiClusterTest(t *testing.T) {
 	p3.Instances = 1
 	p4.Instances = 1
 
-	testConfig.Executions = append(testConfig.Executions, &config.ExecutionConfig{
+	testConfig.Executions = append(testConfig.Executions, &config.Execution{
 		Name:            "simple",
 		Timeout:         15,
 		PackageRoot:     "./sample",
 		ClusterSelector: []string{"a_provider"},
 	})
 
-	testConfig.Executions = append(testConfig.Executions, &config.ExecutionConfig{
-		Name:            "simple2",
-		Timeout:         15,
-		Tags:            []string{"interdomain"},
+	testConfig.Executions = append(testConfig.Executions, &config.Execution{
+		Name:    "simple2",
+		Timeout: 15,
+		Source: config.ExecutionSource{
+			Tags: []string{"interdomain"},
+		},
 		PackageRoot:     "./sample",
 		ClusterCount:    2,
 		KubernetesEnv:   []string{"CFG1", "CFG2"},
 		ClusterSelector: []string{"a_provider", "b_provider"},
 	})
-	testConfig.Executions = append(testConfig.Executions, &config.ExecutionConfig{
-		Name:            "simple3",
-		Timeout:         15,
-		Tags:            []string{"interdomain"},
+	testConfig.Executions = append(testConfig.Executions, &config.Execution{
+		Name:    "simple3",
+		Timeout: 15,
+		Source: config.ExecutionSource{
+			Tags: []string{"interdomain"},
+		},
 		PackageRoot:     "./sample",
 		ClusterCount:    2,
 		KubernetesEnv:   []string{"CFG1", "CFG2"},
@@ -447,7 +455,7 @@ func TestGlobalTimeout(t *testing.T) {
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
 
-	testConfig.Executions = append(testConfig.Executions, &config.ExecutionConfig{
+	testConfig.Executions = append(testConfig.Executions, &config.Execution{
 		Name:        "simple",
 		Timeout:     15,
 		PackageRoot: "./sample",
