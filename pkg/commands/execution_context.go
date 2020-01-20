@@ -379,14 +379,16 @@ func (ctx *executionContext) assignTasks() {
 	ctx.Lock()
 	noTasks := len(ctx.tasks) == 0
 	ctx.Unlock()
-	if noTasks{
+	if noTasks {
 		return
 	}
 	// Lets check if we have cluster required and start it
 	// Check if we have cluster we could assign.
-	newTasks := []*testTask{}
+	var newTasks []*testTask
 
+	ctx.Lock()
 	tasks := ctx.tasks
+	ctx.Unlock()
 
 	for _, task := range tasks {
 		if task.test.Status == model.StatusSkipped {
@@ -410,13 +412,14 @@ func (ctx *executionContext) assignTasks() {
 			} else {
 				ctx.running[task.taskID] = task
 			}
-		}
-		if !canRun {
+		} else {
 			// schedule the task for next assignment round
 			newTasks = append(newTasks, task)
 		}
 	}
+	ctx.Lock()
 	ctx.tasks = newTasks
+	ctx.Unlock()
 }
 
 func (ctx *executionContext) skipTaskDueUnavailableClusters(task *testTask, unavailableClusters []*clustersGroup) {

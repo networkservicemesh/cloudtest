@@ -28,8 +28,6 @@ import (
 	"github.com/networkservicemesh/cloudtest/pkg/utils"
 )
 
-
-
 // RunHealthChecks - Start goroutines with health check probes
 func RunHealthChecks(checkConfigs []*config.HealthCheckConfig) <-chan error {
 	errCh := make(chan error, len(checkConfigs))
