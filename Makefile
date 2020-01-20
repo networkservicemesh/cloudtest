@@ -26,6 +26,9 @@ include .mk/formatting.mk
 # Static code analysis
 include .mk/code_analysis.mk
 
+# Include Yaml lint
+include .mk/yaml.mk
+
 GOPATH?=$(shell go env GOPATH 2>/dev/null)
 GOCMD=go
 GOGET=${GOCMD} get
