@@ -301,10 +301,7 @@ func (ctx *executionContext) performShutdown() {
 				go func() {
 					defer ctx.clusterWaitGroup.Done()
 					logrus.Infof("Closing cluster %v %v", group.config.Name, curInst.id)
-					// TODO - what should we be doing with this error?
-					if err := ctx.destroyCluster(curInst, false, false);err != nil {
-						logrus.Errorf("Error destroying cluster: %+v",err)
-					}
+					_ = ctx.destroyCluster(curInst, false, false)
 				}()
 			}
 		}
@@ -972,10 +969,7 @@ func (ctx *executionContext) executeTask(task *testTask, clusterConfigs []string
 			if err != nil {
 				logrus.Errorf("Task failed because cluster is not valid: %v %v %v", task.test.Name, inst.id, err)
 				clusterNotAvailable = true
-				destroyErr := ctx.destroyCluster(inst, true, false)
-				if destroyErr != nil {
-					logrus.Errorf("An error during destroy cluster: %v", destroyErr)
-				}
+				_ = ctx.destroyCluster(inst, true, false)
 			}
 			ctx.Lock()
 			inst.taskCancel = nil
@@ -1146,10 +1140,7 @@ func (ctx *executionContext) monitorCluster(context context.Context, ci *cluster
 		err := ci.instance.CheckIsAlive()
 		if err != nil {
 			logrus.Errorf("Failed to interact with %s: %v", ci.id, err)
-			// TODO what should we do about this error?
-			if err := ctx.destroyCluster(ci, true, false); err != nil {
-				logrus.Errorf("Error destroying cluster: %+v",err)
-			}
+			_ = ctx.destroyCluster(ci, true, false)
 			break
 		}
 
@@ -1201,7 +1192,7 @@ func (ctx *executionContext) destroyCluster(ci *clusterInstance, sendUpdate, for
 	}
 	err := ci.instance.Destroy(timeout)
 	if err != nil {
-		logrus.Errorf("Failed to destroy cluster")
+		logrus.Errorf("Failed to destroy cluster: %v", err)
 	}
 
 	if ci.group.config.StopDelay != 0 {
@@ -1636,10 +1627,7 @@ func (ctx *executionContext) checkClustersUsage() {
 				logrus.Infof("All tasks for cluster group %v are complete. Starting cluster shutdown.", ci.config.Name)
 				for _, inst := range ci.instances {
 					if !ctx.isClusterDown(inst) && inst.state != clusterBusy {
-						// TODO what should we really be doing with this error?
-						if err := ctx.destroyCluster(inst, false, true);err != nil {
-							logrus.Errorf("Error destroying cluster: %+v",err)
-						}
+						_ = ctx.destroyCluster(inst, false, true)
 						ctx.Lock()
 						inst.state = clusterShutdown
 						ctx.Unlock()

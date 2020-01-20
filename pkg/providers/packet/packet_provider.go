@@ -463,17 +463,6 @@ func (pi *packetInstance) GetRoot() string {
 	return pi.root
 }
 
-// TODO - this function was unused.  Should we delete it or should it be being used?
-//func (pi *packetInstance) doDestroy(writer io.StringWriter, timeout time.Duration, err error) {
-//	_, _ = writer.WriteString(fmt.Sprintf("Error during k8s API initialisation %v", err))
-//	_, _ = writer.WriteString(fmt.Sprintf("Trying to destroy cluster"))
-//	// In case we failed to start and create cluster utils.
-//	err2 := pi.Destroy(timeout)
-//	if err2 != nil {
-//		_, _ = writer.WriteString(fmt.Sprintf("Error during destroy of cluster %v", err2))
-//	}
-//}
-
 func (pi *packetInstance) doInstall(context context.Context) (string, error) {
 	pi.provider.Lock()
 	defer pi.provider.Unlock()
