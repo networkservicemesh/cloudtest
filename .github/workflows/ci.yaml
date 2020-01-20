@@ -49,6 +49,17 @@ jobs:
           eval $(go env)
           mkdir -p ~/junit/
           ${GOPATH}/bin/gotestsum --junitfile ~/junit/unit-tests.xml -- -short $(go list ./...)
+  check-formatter:
+    name: check-formatting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v1
+      - name: Run formatting check
+        run: |
+          make install-formatter
+          make format
+          git diff --exit-code || (echo 'Seems like your Go files are not properly formatted. Run `make format` in your branch and commit the changes.' && exit 1)
   golangci-lint:
     name: golangci-lint
     runs-on: ubuntu-latest
