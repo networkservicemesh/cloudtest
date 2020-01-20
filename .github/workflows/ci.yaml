@@ -48,7 +48,7 @@ jobs:
         run: |
           eval $(go env)
           mkdir -p ~/junit/
-          ${GOPATH}/bin/gotestsum --junitfile ~/junit/unit-tests.xml -- -short $(go list ./...)
+          ${GOPATH}/bin/gotestsum --junitfile ~/junit/unit-tests.xml -- -short $(go list ./... | grep -v -e "sample" | grep -e "^github")
   check-formatter:
     name: check-formatting
     runs-on: ubuntu-latest
