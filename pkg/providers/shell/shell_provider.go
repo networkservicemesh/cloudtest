@@ -19,7 +19,6 @@ package shell
 import (
 	"context"
 	"fmt"
-	"io"
 	"math/rand"
 	"os"
 	"path"
@@ -200,16 +199,6 @@ func (si *shellInstance) Destroy(timeout time.Duration) error {
 
 func (si *shellInstance) GetRoot() string {
 	return si.root
-}
-
-func (si *shellInstance) doDestroy(writer io.StringWriter, timeout time.Duration, err error) {
-	_, _ = writer.WriteString(fmt.Sprintf("Error during k8s API initialisation %v", err))
-	_, _ = writer.WriteString(fmt.Sprintf("Trying to destroy cluster"))
-	// In case we failed to start and create cluster utils.
-	err2 := si.Destroy(timeout)
-	if err2 != nil {
-		_, _ = writer.WriteString(fmt.Sprintf("Error during destroy of cluster %v", err2))
-	}
 }
 
 func (si *shellInstance) doInstall(context context.Context) (string, error) {
