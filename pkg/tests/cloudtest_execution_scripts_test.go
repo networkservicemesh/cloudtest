@@ -80,7 +80,7 @@ func TestAfterWorksCorrectly(t *testing.T) {
 	g.Expect(err).Should(BeNil())
 	g.Expect(report).NotTo(BeNil())
 
-	path := path.Join(tmpDir, provider.Name+"-1", "006-test2-run.log")
+	path := path.Join(tmpDir, provider.Name+"-1", "007-test2-run.log")
 	content, err := ioutil.ReadFile(path)
 	g.Expect(err).Should(BeNil())
 	g.Expect(string(content)).Should(ContainSubstring("After worked"))
@@ -137,7 +137,7 @@ func TestBeforeWorksCorrectly(t *testing.T) {
 	g.Expect(err).Should(BeNil())
 	g.Expect(report).NotTo(BeNil())
 
-	path := path.Join(tmpDir, provider.Name+"-1", "005-test1-run.log")
+	path := path.Join(tmpDir, provider.Name+"-1", "006-test1-run.log")
 	content, err := ioutil.ReadFile(path)
 	g.Expect(err).Should(BeNil())
 	g.Expect(string(content)).Should(ContainSubstring("Before worked"))
