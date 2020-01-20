@@ -17,7 +17,7 @@ commands:
 jobs:
 
 # sanity
-  test-sanity-check:
+  build-and-test:
     resource_class: xlarge
     working_directory: /go/src/github.com/networkservicemesh/cloudtest
     docker:
@@ -48,6 +48,16 @@ jobs:
       - run: go generate ./...
       - run: git diff --exit-code || (echo 'Seems like your generated files are not actual. Run `go generate ./...` for each module in your branch and commit the changes.' && exit 1)
       - run: make vet
+      - run:
+          name: lint
+          command: |
+            ./scripts/lint-download.sh
+            $(pwd)/scripts/lint-check-diff.sh
+      - run:
+          name: license lint
+          command: |
+            go get github.com/denis-tingajkin/go-header@v0.2.0
+            go-header
       - run: go build ./...
       - run: ./scripts/check_dependencies.sh
       - run: mkdir -p ~/junit/
@@ -60,37 +70,11 @@ jobs:
           path: ~/junit
     environment:
       GO111MODULE: "on"
-
-# code analysis
-  test-static-code-analysis:
-    resource_class: large
-    docker:
-      - image: circleci/golang:1.13-stretch
-    steps:
-      - checkout
-      - skip_on_pattern
-      - run:
-          name: lint
-          command: |
-            ./scripts/lint-download.sh
-            $(pwd)/scripts/lint-check-diff.sh
-      - run:
-          name: license lint
-          command: |
-            go get github.com/denis-tingajkin/go-header@v0.2.0
-            go-header
-    environment:
-      GO111MODULE: "on"
       LOG_LEVEL: "error"
-
 
 # workflows
 workflows:
   version: 2
   build-and-test:
     jobs:
-      - test-sanity-check
-      - test-static-code-analysis:
-          name: "test-static-code-analysis"
-          requires:
-            - test-sanity-check
+      - build-and-test
