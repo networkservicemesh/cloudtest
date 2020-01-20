@@ -56,6 +56,7 @@ type shellProvider struct {
 }
 
 type shellInstance struct {
+	sync.Mutex
 	installScript      []string
 	startScript        []string
 	prepareScript      []string
@@ -80,6 +81,8 @@ func (si *shellInstance) GetID() string {
 }
 
 func (si *shellInstance) CheckIsAlive() error {
+	si.Lock()
+	defer si.Unlock()
 	if si.started {
 		return si.validator.Validate()
 	}
@@ -154,7 +157,9 @@ func (si *shellInstance) Start(timeout time.Duration) (string, error) {
 		}
 		si.configLocation = strings.TrimSpace(output)
 	}
+	si.Lock()
 	si.validator, err = si.factory.CreateValidator(si.config, si.configLocation)
+	si.Unlock()
 	if err != nil {
 		msg := fmt.Sprintf("Failed to start validator %v", err)
 		logrus.Errorf(msg)

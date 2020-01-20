@@ -332,7 +332,7 @@ func (ctx *executionContext) performExecution() error {
 	statTicker := time.NewTicker(statsTimeout)
 	defer statTicker.Stop()
 
-	for len(ctx.tasks) > 0 || len(ctx.running) > 0 {
+	for {
 		// WE take 1 test task from list and do execution.
 		ctx.assignTasks()
 		ctx.checkClustersUsage()
@@ -340,8 +340,10 @@ func (ctx *executionContext) performExecution() error {
 		if err := ctx.pollEvents(timeoutCtx, termChannel, healthCheckChannel, statTicker.C); err != nil {
 			return err
 		}
-
-		if len(ctx.tasks) == 0 && len(ctx.running) == 0 {
+		ctx.Lock()
+		noTasks := len(ctx.tasks) == 0 && len(ctx.running) == 0
+		ctx.Unlock()
+		if noTasks {
 			break
 		}
 	}
@@ -374,7 +376,10 @@ func (ctx *executionContext) pollEvents(c context.Context, osCh <-chan os.Signal
 }
 
 func (ctx *executionContext) assignTasks() {
-	if len(ctx.tasks) == 0 {
+	ctx.Lock()
+	noTasks := len(ctx.tasks) == 0
+	ctx.Unlock()
+	if noTasks{
 		return
 	}
 	// Lets check if we have cluster required and start it
