@@ -53,10 +53,11 @@ jobs:
     name: check-formatting
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v1
-      - name: Run formatting check
-        run: |
+      - uses: actions/checkout@v1
+      - uses: actions/setup-go@v1
+        with:
+          go-version: 1.13
+      - run: |
           make install-formatter
           make format
           git diff --exit-code || (echo 'Seems like your Go files are not properly formatted. Run `make format` in your branch and commit the changes.' && exit 1)
