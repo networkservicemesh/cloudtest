@@ -26,7 +26,6 @@ import (
 
 	"github.com/networkservicemesh/cloudtest/pkg/commands"
 	"github.com/networkservicemesh/cloudtest/pkg/config"
-	"github.com/networkservicemesh/cloudtest/pkg/utils"
 )
 
 func TestCloudtestProvidesArtifactsDirForEachTest(t *testing.T) {
@@ -35,12 +34,15 @@ func TestCloudtestProvidesArtifactsDirForEachTest(t *testing.T) {
 	testConfig := &config.CloudTestConfig{}
 
 	testConfig.Timeout = 300
+	err := os.Mkdir(t.Name(), os.ModePerm)
+	g.Expect(err).Should(gomega.BeNil())
+	defer func() {
+		_ = os.RemoveAll(t.Name())
+	}()
+	relativePath, err := ioutil.TempDir(t.Name(), "tmp")
+	g.Expect(err).Should(gomega.BeNil())
 
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
-	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(gomega.BeNil())
-
-	testConfig.ConfigRoot = tmpDir
+	testConfig.ConfigRoot = relativePath
 	createProvider(testConfig, "provider")
 	testConfig.Providers[0].Instances = 1
 	testConfig.Executions = []*config.Execution{{
@@ -56,7 +58,7 @@ func TestCloudtestProvidesArtifactsDirForEachTest(t *testing.T) {
 
 	_, err = commands.PerformTesting(testConfig, &testValidationFactory{}, &commands.Arguments{})
 	g.Expect(err).Should(gomega.BeNil())
-	content, err := ioutil.ReadFile(filepath.Join(tmpDir, testConfig.Providers[0].Name+"-1", "TestArtifacts", "artifact1.txt"))
+	content, err := ioutil.ReadFile(filepath.Join(relativePath, testConfig.Providers[0].Name+"-1", "TestArtifacts", "artifact1.txt"))
 	g.Expect(err).Should(gomega.BeNil())
 	g.Expect(string(content)).Should(gomega.Equal("test result"))
 }

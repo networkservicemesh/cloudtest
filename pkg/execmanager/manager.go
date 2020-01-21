@@ -98,6 +98,7 @@ func (mgr *executionManagerImpl) OpenFileTest(category, testName, operation stri
 func (mgr *executionManagerImpl) AddFolder(category, name string) string {
 	result := path.Join(mgr.root, category, name)
 	_ = os.MkdirAll(result, os.ModePerm)
+	result, _ = filepath.Abs(result)
 	return result
 }
 
