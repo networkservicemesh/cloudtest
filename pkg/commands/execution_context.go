@@ -332,7 +332,7 @@ func (ctx *executionContext) performExecution() error {
 	statTicker := time.NewTicker(statsTimeout)
 	defer statTicker.Stop()
 
-	for len(ctx.tasks) > 0 || len(ctx.running) > 0 {
+	for {
 		// WE take 1 test task from list and do execution.
 		ctx.assignTasks()
 		ctx.checkClustersUsage()
@@ -340,8 +340,10 @@ func (ctx *executionContext) performExecution() error {
 		if err := ctx.pollEvents(timeoutCtx, termChannel, healthCheckChannel, statTicker.C); err != nil {
 			return err
 		}
-
-		if len(ctx.tasks) == 0 && len(ctx.running) == 0 {
+		ctx.Lock()
+		noTasks := len(ctx.tasks) == 0 && len(ctx.running) == 0
+		ctx.Unlock()
+		if noTasks {
 			break
 		}
 	}
@@ -374,14 +376,19 @@ func (ctx *executionContext) pollEvents(c context.Context, osCh <-chan os.Signal
 }
 
 func (ctx *executionContext) assignTasks() {
-	if len(ctx.tasks) == 0 {
+	ctx.Lock()
+	noTasks := len(ctx.tasks) == 0
+	ctx.Unlock()
+	if noTasks {
 		return
 	}
 	// Lets check if we have cluster required and start it
 	// Check if we have cluster we could assign.
-	newTasks := []*testTask{}
+	var newTasks []*testTask
 
+	ctx.Lock()
 	tasks := ctx.tasks
+	ctx.Unlock()
 
 	for _, task := range tasks {
 		if task.test.Status == model.StatusSkipped {
@@ -405,13 +412,14 @@ func (ctx *executionContext) assignTasks() {
 			} else {
 				ctx.running[task.taskID] = task
 			}
-		}
-		if !canRun {
+		} else {
 			// schedule the task for next assignment round
 			newTasks = append(newTasks, task)
 		}
 	}
+	ctx.Lock()
 	ctx.tasks = newTasks
+	ctx.Unlock()
 }
 
 func (ctx *executionContext) skipTaskDueUnavailableClusters(task *testTask, unavailableClusters []*clustersGroup) {

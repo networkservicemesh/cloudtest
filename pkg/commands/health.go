@@ -30,11 +30,10 @@ import (
 
 // RunHealthChecks - Start goroutines with health check probes
 func RunHealthChecks(checkConfigs []*config.HealthCheckConfig) <-chan error {
-	errCh := make(chan error)
-	ready := true
-
+	errCh := make(chan error, len(checkConfigs))
 	for i := range checkConfigs {
 		go func(c int) {
+			ready := true
 			config := checkConfigs[c]
 			for {
 				interval := time.Duration(config.Interval) * time.Second
