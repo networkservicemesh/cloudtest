@@ -8,13 +8,13 @@ statistics:
   interval: 30    # with 30 seconds interval
 
 providers:
-  - name: "kind"  # A name of our provider
-    kind: "shell" # A type of provider, shell indicate we need to specify all operations with shell commands.
-    instances: 1  # We need to have 1 instance of cloud.
-    node-count: 3 # With 3 nodes, CloudTest will validate if cloud has 3 nodes alive.
-    retry: 1 # A retry count if cloud is failed to start tool will try again.
-    enabled: true # Indicate Provider is active with config by default, if set to false, values could be overriden using command line arguments.
-    timeout: 300  # 5 minutes to start a cluster.
+  - name: "kind"    # A name of our provider
+    kind: "shell"   # A type of provider, shell indicate we need to specify all operations with shell commands.
+    instances: 1    # We need to have 1 instance of cloud.
+    node-count: 3   # With 3 nodes, CloudTest will validate if cloud has 3 nodes alive.
+    retry: 1  # A retry count if cloud is failed to start tool will try again.
+    enabled: true   # Indicate Provider is active with config by default, if set to false, values could be overriden using command line arguments.
+    timeout: 300    # 5 minutes to start a cluster.
     env:
       - KIND_CLUSTER_NAME=cloudtest-kind-$(rands10)   # Generate a uniq cluster name
       - CONFIG_LOCATION=$(tempdir)/config             # Put Kubernetes configuration file here, $(tempdir) a executable variable name pointing to temporary folder.

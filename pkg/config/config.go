@@ -28,13 +28,13 @@ type DeviceConfig struct {
 type PacketConfig struct {
 	Devices           []*DeviceConfig `yaml:"devices"`            // A set of device configuration required to be created before starting cluster.
 	Facilities        []string        `yaml:"facilities"`         // A set of facility filters
-	PreferredFacility string          `yaml:"preferred-facility"` // A prefered facility key
+	PreferredFacility string          `yaml:"preferred-facility"` // A preferred facility key
 	SshKey            string          `yaml:"ssh-key"`            // A location of ssh key
 }
 
 type ClusterProviderConfig struct {
 	Name       string            `yaml:"name"`       // name of provider, GKE, Azure, etc.
-	Kind       string            `yaml:"kind"`       // register provider type, 'generic', 'gke', multi-cluster
+	Kind       string            `yaml:"kind"`       // register provider type, 'shell', 'packet'
 	Instances  int               `yaml:"instances"`  // Number of required instances, executions will be split between instances.
 	Timeout    int               `yaml:"timeout"`    // Timeout for start, stop
 	RetryCount int               `yaml:"retry"`      // A count of start retrying steps.
