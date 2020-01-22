@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Cisco Systems, Inc and/or its affiliates.
+// Copyright (c) 2019-2020 Cisco Systems, Inc and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -56,10 +57,12 @@ const (
 // Arguments - command line arguments
 type Arguments struct {
 	clusters        []string // A list of enabled clusters from configuration.
+	kinds           []string // A list of enabled cluster kinds from configuration.
+	tags            []string // Run tests with given tag(s) only
 	providerConfig  string   // A folder to start scaning for tests inside
 	count           int      // Limit number of tests to be run per every cloud
 	instanceOptions providers.InstanceOptions
-	onlyEnabled     bool // Disable all clusters and enable only enabled in command line.
+	onlyRun         []string // A list of tests to run.
 }
 
 type clusterState byte
@@ -172,6 +175,27 @@ func CloudTestRun(cmd *cloudTestCmd) {
 		os.Exit(1)
 	}
 
+	if len(cmd.cmdArguments.onlyRun) > 0 {
+		testConfig.OnlyRun = cmd.cmdArguments.onlyRun
+	}
+
+	if len(testConfig.OnlyRun) > 0 {
+		logrus.Infof("Imposing top-level 'only-run' tests to all executions: %v", testConfig.OnlyRun)
+		for _, e := range testConfig.Executions {
+			if len(e.OnlyRun) > 0 {
+				logrus.Warningf("Overwriting non-empty 'only-run' on execution '%s'", e.Name)
+			}
+			e.OnlyRun = testConfig.OnlyRun
+		}
+	}
+
+	if len(cmd.cmdArguments.tags) > 0 {
+		logrus.Infof("Imposing top-level 'tags' to all executions: %v", cmd.cmdArguments.tags)
+		for _, e := range testConfig.Executions {
+			e.Source.Tags = cmd.cmdArguments.tags
+		}
+	}
+
 	// Process config imports
 	err = performImport(testConfig)
 	if err != nil {
@@ -245,6 +269,11 @@ func PerformTesting(config *config.CloudTestConfig, factory k8s.ValidationFactor
 }
 
 func performTestingContext(ctx *executionContext) (*reporting.JUnitFile, error) {
+	// Collect tests
+	if err := ctx.findTests(); err != nil {
+		logrus.Errorf("Error finding tests %v", err)
+		return nil, err
+	}
 	// Create cluster instance handles
 	if err := ctx.createClusters(); err != nil {
 		return nil, err
@@ -252,11 +281,6 @@ func performTestingContext(ctx *executionContext) (*reporting.JUnitFile, error) 
 	cleanupCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go ctx.cleanupClusters(cleanupCtx)
-	// Collect tests
-	if err := ctx.findTests(); err != nil {
-		logrus.Errorf("Error finding tests %v", err)
-		return nil, err
-	}
 	// We need to be sure all clusters will be deleted on end of execution.
 	defer ctx.performShutdown()
 	// Fill tasks to be executed..
@@ -1227,23 +1251,11 @@ func (ctx *executionContext) createClusters() error {
 	}
 
 	for _, cl := range ctx.cloudTestConfig.Providers {
-		if ctx.arguments.onlyEnabled {
-			logrus.Infof("Disable cluster config:: %v since onlyEnabled is passed...", cl.Name)
-			cl.Enabled = false
-		}
-		for _, cc := range ctx.arguments.clusters {
-			if cl.Name == cc {
-				if !cl.Enabled {
-					logrus.Infof("Enabling config:: %v", cl.Name)
-				}
-				cl.Enabled = true
-			}
-		}
-		if cl.Enabled {
-			logrus.Infof("Initialize provider for config:: %v %v", cl.Name, cl.Kind)
+		if enable, testCount := ctx.shouldEnableCluster(cl); enable {
+			logrus.Infof("Initialize provider for config: %v %v", cl.Name, cl.Kind)
 			provider, ok := clusterProviders[cl.Kind]
 			if !ok {
-				msg := fmt.Sprintf("Cluster provider %s are not found...", cl.Kind)
+				msg := fmt.Sprintf("Cluster provider '%s' not found", cl.Kind)
 				logrus.Errorf(msg)
 				return errors.New(msg)
 			}
@@ -1254,6 +1266,10 @@ func (ctx *executionContext) createClusters() error {
 				tasks:     map[string]*testTask{},
 				completed: map[string]*testTask{},
 			}
+			testsPerInstance := int(math.Min(float64(ctx.cloudTestConfig.TestsPerClusterInstance), 20))
+			// initial value of cl.Instances is treated as allowed maximum
+			cl.Instances = int(math.Ceil(math.Min(float64(testCount)/float64(testsPerInstance), float64(cl.Instances))))
+			logrus.Infof("Creating %d instances of '%s' cluster to run %d test(s)", cl.Instances, cl.Name, testCount)
 			for i := 0; i < cl.Instances; i++ {
 				cluster, err := provider.CreateCluster(cl, ctx.factory, ctx.manager, ctx.arguments.instanceOptions)
 				if err != nil {
@@ -1305,10 +1321,47 @@ func (ctx *executionContext) appendTests(tests ...*model.TestEntry) {
 	ctx.tests = append(ctx.tests, tests...)
 }
 
+func (ctx *executionContext) shouldEnableCluster(cl *config.ClusterProviderConfig) (bool, int) {
+	enabledByCommandLine := utils.Contains(ctx.arguments.clusters, cl.Name)
+	if !cl.Enabled && !enabledByCommandLine {
+		logrus.Infof("Skipping disabled cluster config: %v", cl.Name)
+		return false, 0
+	}
+	cl.Enabled = len(ctx.arguments.clusters) == 0 || enabledByCommandLine
+	if !cl.Enabled {
+		logrus.Infof("Disabling cluster config by cluster filter: %v", cl.Name)
+		return false, 0
+	}
+	cl.Enabled = len(ctx.arguments.kinds) == 0 || utils.Contains(ctx.arguments.kinds, cl.Kind)
+	if !cl.Enabled {
+		logrus.Infof("Disabling cluster config by kind filter: %v", cl.Name)
+		return false, 0
+	}
+
+	// find out if the cluster is required for found tests
+	cl.Enabled = false
+	testCount := 0
+	for _, ex := range ctx.cloudTestConfig.Executions {
+		// accept empty Kind to make unit tests work
+		kindMatches := ex.Kind == "" || ex.Kind == cl.Kind
+		mightBeUsed := len(ex.ClusterSelector) == 0 || utils.Contains(ex.ClusterSelector, cl.Name)
+		if kindMatches && mightBeUsed && ex.TestsFound > 0 {
+			cl.Enabled = true
+			testCount = testCount + ex.TestsFound
+		}
+	}
+	if !cl.Enabled {
+		logrus.Infof("No tests found for cluster config '%v', skipping", cl.Name)
+	}
+
+	return cl.Enabled, testCount
+}
+
 func (ctx *executionContext) findTests() error {
 	logrus.Infof("Finding tests")
 
 	for _, exec := range ctx.cloudTestConfig.Executions {
+		testCount := len(ctx.tests)
 		if exec.Name == "" {
 			return errors.New("execution name should be specified")
 		}
@@ -1324,6 +1377,7 @@ func (ctx *executionContext) findTests() error {
 		} else {
 			return errors.Errorf("unknown executon kind %v", exec.Kind)
 		}
+		exec.TestsFound = len(ctx.tests) - testCount
 	}
 	// If we have execution without tags, we need to remove all tests from it from tagged executions.
 	logrus.Infof("Total tests found: %v", len(ctx.tests))
@@ -1359,17 +1413,12 @@ func (ctx *executionContext) findGoTest(executionConfig *config.Execution) ([]*m
 	for _, t := range execTests {
 		t.Kind = model.TestEntryKindGoTest
 		t.ExecutionConfig = executionConfig
-		match := true
-		for _, v := range executionConfig.OnlyRun {
-			match = false
-			if v == t.Name {
-				match = true
-				break
-			}
-		}
-		if match {
+		if len(executionConfig.OnlyRun) == 0 || utils.Contains(executionConfig.OnlyRun, t.Name) {
 			result = append(result, t)
 		}
+	}
+	if len(result) != len(execTests) {
+		logrus.Infof("Tests after filtering: %v", len(result))
 	}
 	return result, nil
 }
@@ -1724,10 +1773,11 @@ func ExecuteCloudTest() {
 			clusters:       []string{},
 		},
 	}
-	rootCmd.Use = "cloud_test"
+	rootCmd.Use = "cloudtest"
 	rootCmd.Short = "NSM Cloud Test is cloud helper continuous integration testing tool"
 	rootCmd.Long = `Allow to execute all set of individual tests across all clouds provided.`
 	rootCmd.Run = func(cmd *cobra.Command, args []string) {
+		rootCmd.cmdArguments.onlyRun = args
 		CloudTestRun(rootCmd)
 	}
 	rootCmd.Args = func(cmd *cobra.Command, args []string) error {
@@ -1744,19 +1794,29 @@ func ExecuteCloudTest() {
 
 func initCmd(rootCmd *cloudTestCmd) {
 	cobra.OnInitialize(initConfig)
-	rootCmd.Flags().StringVarP(&rootCmd.cmdArguments.providerConfig, "config", "", "", "Config file for providers, default="+defaultConfigFile)
-	rootCmd.Flags().StringArrayVarP(&rootCmd.cmdArguments.clusters, "clusters", "c", []string{}, "Enable disable cluster configs, default use from config. Cloud be used to test against selected configuration or locally...")
-	rootCmd.Flags().BoolVarP(&rootCmd.cmdArguments.onlyEnabled, "enabled", "e", false, "Use only passed cluster names...")
-	rootCmd.Flags().IntVarP(&rootCmd.cmdArguments.count, "count", "", -1, "Execute only count of tests")
+	rootCmd.Flags().StringVarP(&rootCmd.cmdArguments.providerConfig,
+		"config", "", "", "Config file, default="+defaultConfigFile)
+	rootCmd.Flags().StringSliceVarP(&rootCmd.cmdArguments.clusters,
+		"cluster", "c", []string{}, "Enable only specified cluster config(s)")
+	rootCmd.Flags().StringSliceVarP(&rootCmd.cmdArguments.kinds,
+		"kind", "k", []string{}, "Enable only specified cluster kind(s)")
+	rootCmd.Flags().StringSliceVarP(&rootCmd.cmdArguments.tags,
+		"tags", "t", []string{}, "Run tests with given tag(s) only")
+	rootCmd.Flags().IntVarP(&rootCmd.cmdArguments.count,
+		"count", "", -1, "Execute only count of tests")
 
-	rootCmd.Flags().BoolVarP(&rootCmd.cmdArguments.instanceOptions.NoStop, "noStop", "", false, "Pass to disable stop operations...")
-	rootCmd.Flags().BoolVarP(&rootCmd.cmdArguments.instanceOptions.NoInstall, "noInstall", "", false, "Pass to disable do install operations...")
-	rootCmd.Flags().BoolVarP(&rootCmd.cmdArguments.instanceOptions.NoPrepare, "noPrepare", "", false, "Pass to disable do prepare operations...")
-	rootCmd.Flags().BoolVarP(&rootCmd.cmdArguments.instanceOptions.NoMaskParameters, "noMask", "", false, "Pass to disable masking of environment variables...")
+	rootCmd.Flags().BoolVarP(&rootCmd.cmdArguments.instanceOptions.NoStop,
+		"noStop", "", false, "Skip stop operations")
+	rootCmd.Flags().BoolVarP(&rootCmd.cmdArguments.instanceOptions.NoInstall,
+		"noInstall", "", false, "Skip install operations")
+	rootCmd.Flags().BoolVarP(&rootCmd.cmdArguments.instanceOptions.NoPrepare,
+		"noPrepare", "", false, "Skip prepare operations")
+	rootCmd.Flags().BoolVarP(&rootCmd.cmdArguments.instanceOptions.NoMaskParameters,
+		"noMask", "", false, "Disable masking of environment variables in output")
 
 	var versionCmd = &cobra.Command{
 		Use:   "version",
-		Short: "Print the version number of cloud_test",
+		Short: "Print the version number of cloudtest",
 		Long:  `All software has versions.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Println("Cloud Test -- HEAD")

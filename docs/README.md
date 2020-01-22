@@ -44,23 +44,24 @@ some output and results to obtain.
 
 ```
 Usage:
-  * cloud_test [flags]
-  * cloud_test [command]
+  cloudtest [flags]
+  cloudtest [command]
 
 Available Commands:
   help        Help about any command
-  version     Print the version number of cloud_test
+  version     Print the version number of cloudtest
 
 Flags:
-  -c, --clusters stringArray   Enable disable cluster configs, default use from config. Cloud be used to test against selected configuration or locally...
-      --config string          Config file for providers, default=.cloudtest.yaml
-      --count int              Execute only count of tests (default -1)
-  -e, --enabled                Use only passed cluster names...
-  -h, --help                   help for cloud_test
-      --noInstall              Pass to disable do install operations...
-      --noMask                 Pass to disable masking of environment variables...
-      --noPrepare              Pass to disable do prepare operations...
-      --noStop                 Pass to disable stop operations...
+  -c, --cluster strings   Enable only specified cluster config(s)
+      --config string     Config file, default=.cloudtest.yaml
+      --count int         Execute only count of tests (default -1)
+  -h, --help              help for cloudtest
+  -k, --kind strings      Enable only specified cluster kind(s)
+      --noInstall         Skip install operations
+      --noMask            Disable masking of environment variables in output
+      --noPrepare         Skip prepare operations
+      --noStop            Skip stop operations
+  -t, --tags strings      Run tests with given tag(s) only
 ```
 
 ### Configuration file

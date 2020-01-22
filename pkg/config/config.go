@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Cisco Systems, Inc and/or its affiliates.
+// Copyright (c) 2019-2020 Cisco Systems, Inc and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -72,6 +72,7 @@ type Execution struct {
 	OnFail          string          `yaml:"on_fail"`          // A script to execute against required cluster, called if task failed
 
 	ConcurrencyRetry int64 `yaml:"test-retry-count"` // A count of times, same test will be executed to find concurrency issues
+	TestsFound       int   `yaml:"-"`                // Number of tests found for the config
 }
 
 type RetestConfig struct {
@@ -108,7 +109,10 @@ type CloudTestConfig struct {
 		Enabled  bool  `yaml:"enabled"`  // A way to disable printing of statistics
 	} `yaml:"statistics"` // Statistics options
 
-	ShuffleTests bool `yaml:"shuffle-enabled"` // Shuffle tests before assignment
+	ShuffleTests bool     `yaml:"shuffle-enabled"` // Shuffle tests before assignment
+	OnlyRun      []string `yaml:"only-run"`        // If non-empty, only run the listed tests
+
+	TestsPerClusterInstance int `yaml:"tests-per-cluster-instance"` // Number of tests per cluster instance
 }
 
 // NewCloudTestConfig - creates a test config with some default values specified.
