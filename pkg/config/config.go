@@ -20,7 +20,7 @@ package config
 type DeviceConfig struct {
 	Plan            string `yaml:"plan"` // Plan
 	OperatingSystem string `yaml:"os"`   // Operating system
-	BillingCycle    string `yaml:"billing_cycle"`
+	BillingCycle    string `yaml:"billing-cycle"`
 	Name            string `yaml:"name"`      // Host name prefix, will create ENV variable IP_HostName
 	HostName        string `yaml:"host-name"` // Host name with variable substitutions supported.
 }
@@ -65,11 +65,11 @@ type Execution struct {
 	Timeout         int64           `yaml:"timeout"`          // Invidiaul test timeout, "60" passed to gotest, in seconds
 	ExtraOptions    []string        `yaml:"extra-options"`    // Extra options to pass to gotest
 	ClusterCount    int             `yaml:"cluster-count"`    // A number of clusters required for this execution, default 1
-	KubernetesEnv   []string        `yaml:"kubernetes-env"`   // Names of environment variables to put cluster names inside.
+	ClusterEnv      []string        `yaml:"cluster-env"`      // Names of environment variables to put cluster names inside.
 	ClusterSelector []string        `yaml:"cluster-selector"` // A cluster name to execute this tests on.
 	Env             []string        `yaml:"env"`              // Additional environment variables
 	Run             string          `yaml:"run"`              // A script to execute against required cluster
-	OnFail          string          `yaml:"on_fail"`          // A script to execute against required cluster, called if task failed
+	OnFail          string          `yaml:"on-fail"`          // A script to execute against required cluster, called if task failed
 
 	ConcurrencyRetry int64 `yaml:"test-retry-count"` // A count of times, same test will be executed to find concurrency issues
 	TestsFound       int   `yaml:"-"`                // Number of tests found for the config

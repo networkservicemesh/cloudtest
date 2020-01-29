@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Cisco Systems, Inc and/or its affiliates.
+// Copyright (c) 2019-2020 Cisco Systems, Inc and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -420,7 +420,7 @@ func TestMultiClusterTest(t *testing.T) {
 		},
 		PackageRoot:     "./sample",
 		ClusterCount:    2,
-		KubernetesEnv:   []string{"CFG1", "CFG2"},
+		ClusterEnv:      []string{"CFG1", "CFG2"},
 		ClusterSelector: []string{"a_provider", "b_provider"},
 	})
 	testConfig.Executions = append(testConfig.Executions, &config.Execution{
@@ -431,7 +431,7 @@ func TestMultiClusterTest(t *testing.T) {
 		},
 		PackageRoot:     "./sample",
 		ClusterCount:    2,
-		KubernetesEnv:   []string{"CFG1", "CFG2"},
+		ClusterEnv:      []string{"CFG1", "CFG2"},
 		ClusterSelector: []string{"c_provider", "d_provider"},
 	})
 
