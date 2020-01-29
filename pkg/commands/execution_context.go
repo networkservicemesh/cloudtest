@@ -888,8 +888,8 @@ func (ctx *executionContext) executeTask(task *testTask, clusterConfigs []string
 	var env []string
 
 	// Fill Kubernetes environment variables.
-	if len(task.test.ExecutionConfig.KubernetesEnv) > 0 {
-		for ind, envV := range task.test.ExecutionConfig.KubernetesEnv {
+	if len(task.test.ExecutionConfig.ClusterEnv) > 0 {
+		for ind, envV := range task.test.ExecutionConfig.ClusterEnv {
 			env = append(env, fmt.Sprintf("%s=%s", envV, clusterConfigs[ind]))
 		}
 	} else {

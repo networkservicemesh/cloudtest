@@ -33,9 +33,9 @@ executions:
     root: ./tests           # A root where to find tests
     timeout: 60             # Timeout for execution configuration
     cluster-count: 1        # A number of clusters requires for this execution.
-    kubernetes-env:
+    cluster-env:
       - KUBECONFIG          # A name of cluster configuration variable to be passed with name.
-    on_fail: |
+    on-fail: |
       echo "Do cleanup on failure"  # In case of execution failure this script will cleanup after test
   - name: "Sample shell tests"    # Name of execution configuration
     env:
@@ -45,7 +45,7 @@ executions:
     cluster-count: 1        # A number of clusters requires for this execution.
     run: |
       echo "Sample shell command"
-    kubernetes-env:
+    cluster-env:
       - KUBECONFIG          # A name of cluster configuration variable to be passed with name.
-    on_fail: |
+    on-fail: |
       echo "Do cleanup on failure"  # In case of execution failure this script will cleanup after test

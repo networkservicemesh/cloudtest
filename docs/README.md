@@ -208,12 +208,12 @@ providers:
           host-name: "Master-${CLUSTER_NAME}"
           plan: "t1.small.x86"
           os: "ubuntu_16_04"
-          billing_cycle: "hourly"
+          billing-cycle: "hourly"
         - name: "Worker"
           host-name: "Worker-${CLUSTER_NAME}"
           plan: "t1.small.x86"
           os: "ubuntu_16_04"
-          billing_cycle: "hourly"
+          billing-cycle: "hourly"
       facilities:
         - baremetal
         - layer_2
@@ -284,9 +284,9 @@ executions:
      root: ./test/integration
      timeout: 300
      cluster-count: 1
-     kubernetes-env:
+     cluster-env:
        - KUBECONFIG
-     on_fail: |
+     on-fail: |
        make k8s-delete-nsm-namespaces
 ```
 
@@ -309,9 +309,9 @@ Example of multi-could test, in this case we specify names of provider and diffe
      cluster-selector:
        - packet
        - aws
-     kubernetes-env:
+     cluster-env:
        - KUBECONFIG_CLUSTER_1
        - KUBECONFIG_CLUSTER_2
-     on_fail: |
+     on-fail: |
        make k8s-delete-nsm-namespaces
 ```
