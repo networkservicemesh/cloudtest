@@ -1200,7 +1200,7 @@ func (ctx *executionContext) monitorCluster(context context.Context, ci *cluster
 }
 
 func (ctx *executionContext) destroyCluster(ci *clusterInstance, sendUpdate, fork bool) error {
-	if ci.state == clusterCrashed || ci.state == clusterNotAvailable || ci.state == clusterShutdown {
+	if ci.state == clusterCrashed || ci.state == clusterNotAvailable || ci.state == clusterShutdown || ci.state == clusterStarting {
 		// It is already destroyed or not available.
 		return nil
 	}
