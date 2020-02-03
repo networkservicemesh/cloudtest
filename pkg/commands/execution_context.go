@@ -1128,6 +1128,9 @@ func (ctx *executionContext) startCluster(ci *clusterInstance) bool {
 			execution.logFile = errFile
 			execution.errMsg = err
 			execution.status = clusterCrashed
+			ctx.Lock()
+			ci.state = clusterStopping
+			ctx.Unlock()
 			destroyErr := ctx.destroyCluster(ci, true, false)
 			if destroyErr != nil {
 				logrus.Errorf("Both start and destroy of cluster returned errors, stop retrying operations with this cluster %v", ci.instance)
