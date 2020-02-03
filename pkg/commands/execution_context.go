@@ -1128,6 +1128,9 @@ func (ctx *executionContext) startCluster(ci *clusterInstance) bool {
 			execution.logFile = errFile
 			execution.errMsg = err
 			execution.status = clusterCrashed
+			ctx.Lock()
+			ci.state = clusterStopping
+			ctx.Unlock()
 			destroyErr := ctx.destroyCluster(ci, true, false)
 			if destroyErr != nil {
 				logrus.Errorf("Both start and destroy of cluster returned errors, stop retrying operations with this cluster %v", ci.instance)
@@ -1200,7 +1203,7 @@ func (ctx *executionContext) monitorCluster(context context.Context, ci *cluster
 }
 
 func (ctx *executionContext) destroyCluster(ci *clusterInstance, sendUpdate, fork bool) error {
-	if ci.state == clusterCrashed || ci.state == clusterNotAvailable || ci.state == clusterShutdown {
+	if ci.state == clusterCrashed || ci.state == clusterNotAvailable || ci.state == clusterShutdown || ci.state == clusterStarting {
 		// It is already destroyed or not available.
 		return nil
 	}
