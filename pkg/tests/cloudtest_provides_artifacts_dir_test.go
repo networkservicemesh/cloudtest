@@ -56,7 +56,7 @@ func TestCloudtestProvidesArtifactsDirForEachTest(t *testing.T) {
 
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
-	_, err = commands.PerformTesting(testConfig, &testValidationFactory{}, &commands.Arguments{})
+	_, err = commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
 	g.Expect(err).Should(gomega.BeNil())
 	content, err := ioutil.ReadFile(filepath.Join(relativePath, testConfig.Providers[0].Name+"-1", "TestArtifacts", "artifact1.txt"))
 	g.Expect(err).Should(gomega.BeNil())
