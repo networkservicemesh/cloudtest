@@ -77,22 +77,28 @@ func TestClusterInstanceStates(t *testing.T) {
 	ctx.startCluster(ctx.clusters[1].instances[0])
 
 	<-time.After(100 * time.Millisecond)
+
+	ctx.Lock()
 	g.Expect(ctx.clusters[0].instances[0].state).To(BeEquivalentTo(clusterReady))
 	g.Expect(ctx.clusters[1].instances[0].state).To(BeEquivalentTo(clusterCrashed))
 
-	ctx.Lock()
 	ctx.clusters[0].instances[0].state = clusterStarting
 	ctx.Unlock()
+
 	err = ctx.destroyCluster(ctx.clusters[0].instances[0], false, false)
 	g.Expect(err).To(BeNil())
-	g.Expect(ctx.clusters[0].instances[0].state).To(BeEquivalentTo(clusterStarting))
 
 	ctx.Lock()
+	g.Expect(ctx.clusters[0].instances[0].state).To(BeEquivalentTo(clusterStarting))
+
 	ctx.clusters[0].instances[0].state = clusterStopping
 	ctx.Unlock()
+
 	err = ctx.destroyCluster(ctx.clusters[0].instances[0], false, false)
 	g.Expect(err).To(BeNil())
+	ctx.Lock()
 	g.Expect(ctx.clusters[0].instances[0].state).To(BeEquivalentTo(clusterCrashed))
+	ctx.Unlock()
 }
 
 func createProvider(testConfig *config.CloudTestConfig, name, startScript string) *config.ClusterProviderConfig {
