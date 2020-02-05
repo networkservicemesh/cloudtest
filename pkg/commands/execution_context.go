@@ -1704,7 +1704,7 @@ func (ctx *executionContext) isClusterDown(inst *clusterInstance) bool {
 
 func (ctx *executionContext) handleScript(args *runScriptArgs) error {
 	if strings.TrimSpace(args.Script) == "" {
-		logrus.Warnf("%v is empty script. Nothing to run", args.Name)
+		_, _ = args.Out.WriteString(fmt.Sprintf("%v is empty script. Nothing to run\n", args.Name))
 		return nil
 	}
 	mgr := shell_mgr.NewEnvironmentManager()
