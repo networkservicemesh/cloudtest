@@ -175,27 +175,6 @@ func CloudTestRun(cmd *cloudTestCmd) {
 		os.Exit(1)
 	}
 
-	if len(cmd.cmdArguments.onlyRun) > 0 {
-		testConfig.OnlyRun = cmd.cmdArguments.onlyRun
-	}
-
-	if len(testConfig.OnlyRun) > 0 {
-		logrus.Infof("Imposing top-level 'only-run' tests to all executions: %v", testConfig.OnlyRun)
-		for _, e := range testConfig.Executions {
-			if len(e.OnlyRun) > 0 {
-				logrus.Warningf("Overwriting non-empty 'only-run' on execution '%s'", e.Name)
-			}
-			e.OnlyRun = testConfig.OnlyRun
-		}
-	}
-
-	if len(cmd.cmdArguments.tags) > 0 {
-		logrus.Infof("Imposing top-level 'tags' to all executions: %v", cmd.cmdArguments.tags)
-		for _, e := range testConfig.Executions {
-			e.Source.Tags = cmd.cmdArguments.tags
-		}
-	}
-
 	// Process config imports
 	err = performImport(testConfig)
 	if err != nil {
@@ -254,6 +233,27 @@ func importFiles(testConfig *config.CloudTestConfig, files ...string) error {
 
 // PerformTesting performs testing uses cloud test config. Returns the junit report when testing finished.
 func PerformTesting(config *config.CloudTestConfig, factory k8s.ValidationFactory, arguments *Arguments) (*reporting.JUnitFile, error) {
+	if len(arguments.onlyRun) > 0 {
+		config.OnlyRun = arguments.onlyRun
+	}
+
+	if len(config.OnlyRun) > 0 {
+		logrus.Infof("Imposing top-level 'only-run' tests to all executions: %v", config.OnlyRun)
+		for _, e := range config.Executions {
+			if len(e.OnlyRun) > 0 {
+				logrus.Warningf("Overwriting non-empty 'only-run' on execution '%s'", e.Name)
+			}
+			e.OnlyRun = config.OnlyRun
+		}
+	}
+
+	if len(arguments.tags) > 0 {
+		logrus.Infof("Imposing top-level 'tags' to all executions: %v", arguments.tags)
+		for _, e := range config.Executions {
+			e.Source.Tags = arguments.tags
+		}
+	}
+
 	ctx := &executionContext{
 		cloudTestConfig:  config,
 		operationChannel: make(chan operationEvent, 100),
