@@ -109,8 +109,9 @@ type CloudTestConfig struct {
 		Enabled  bool  `yaml:"enabled"`  // A way to disable printing of statistics
 	} `yaml:"statistics"` // Statistics options
 
-	ShuffleTests bool     `yaml:"shuffle-enabled"` // Shuffle tests before assignment
-	OnlyRun      []string `yaml:"only-run"`        // If non-empty, only run the listed tests
+	ShuffleTests     bool     `yaml:"shuffle-enabled"`    // Shuffle tests before assignment
+	OnlyRun          []string `yaml:"only-run"`           // If non-empty, only run the listed tests
+	FailedTestsLimit int      `yaml:"failed-tests-limit"` // If non-zero, terminates testing after failed tests limit is reached
 
 	TestsPerClusterInstance int `yaml:"tests-per-cluster-instance"` // Number of tests per cluster instance
 }
