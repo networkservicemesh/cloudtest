@@ -395,6 +395,9 @@ func (ctx *executionContext) pollEvents(c context.Context, osCh <-chan os.Signal
 		if ctx.cloudTestConfig.Statistics.Enabled {
 			ctx.printStatistics()
 		}
+		if ctx.cloudTestConfig.FailedTestsLimit != 0 && stat.failedTests >= ctx.cloudTestConfig.FailedTestsLimit {
+			return errors.New("failed tests limit is reached")
+		}
 	}
 	return nil
 }
