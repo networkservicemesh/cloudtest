@@ -57,13 +57,14 @@ func TestUpdateTaskWithTimeout_ShouldNotCompleteTask(t *testing.T) {
 		},
 	}
 	statsTimeout := time.Minute
-	healthCheckChannel := RunHealthChecks(ctx.cloudTestConfig.HealthCheck)
+	ctx.terminationChannel = make(chan error, len(ctx.cloudTestConfig.HealthCheck))
+	RunHealthChecks(ctx.cloudTestConfig.HealthCheck, ctx.terminationChannel)
 	termChannel := utils.NewOSSignalChannel()
 	statTicker := time.NewTicker(statsTimeout)
 	defer statTicker.Stop()
 
 	ctx.tasks = append(ctx.tasks, task)
 	ctx.updateTestExecution(task, "", model.StatusTimeout)
-	_ = ctx.pollEvents(context.Background(), termChannel, healthCheckChannel, statTicker.C)
+	_ = ctx.pollEvents(context.Background(), termChannel, statTicker.C)
 	assert.Expect(len(ctx.completed)).Should(gomega.BeZero())
 }
