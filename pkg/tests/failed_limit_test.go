@@ -17,6 +17,7 @@
 package tests
 
 import (
+	"fmt"
 	"github.com/networkservicemesh/cloudtest/pkg/commands"
 	"github.com/networkservicemesh/cloudtest/pkg/config"
 	. "github.com/onsi/gomega"
@@ -44,7 +45,7 @@ func TestTerminateTestingAfterFailuresLimitReached(t *testing.T) {
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
 	g.Expect(err).ShouldNot(BeNil())
-	g.Expect(err.Error()).To(Equal("failed tests limit is reached"))
+	g.Expect(err.Error()).To(Equal(fmt.Sprintf("failed tests limit is reached: %d", failedTestLimit)))
 	g.Expect(report).ShouldNot(BeNil())
 	g.Expect(report.Suites[0].Failures).To(Equal(failedTestLimit))
 }

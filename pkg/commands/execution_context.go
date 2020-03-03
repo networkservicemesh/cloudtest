@@ -135,21 +135,22 @@ type operationEvent struct {
 
 type executionContext struct {
 	sync.RWMutex
-	manager          execmanager.ExecutionManager
-	clusters         []*clustersGroup
-	operationChannel chan operationEvent
-	tests            []*model.TestEntry
-	tasks            []*testTask
-	running          map[string]*testTask
-	completed        []*testTask
-	skipped          []*testTask
-	cloudTestConfig  *config.CloudTestConfig
-	report           *reporting.JUnitFile
-	startTime        time.Time
-	clusterReadyTime time.Time
-	factory          k8s.ValidationFactory
-	arguments        *Arguments
-	clusterWaitGroup sync.WaitGroup // Wait group for clusters destroying
+	manager            execmanager.ExecutionManager
+	clusters           []*clustersGroup
+	operationChannel   chan operationEvent
+	terminationChannel chan error
+	tests              []*model.TestEntry
+	tasks              []*testTask
+	running            map[string]*testTask
+	completed          []*testTask
+	skipped            []*testTask
+	cloudTestConfig    *config.CloudTestConfig
+	report             *reporting.JUnitFile
+	startTime          time.Time
+	clusterReadyTime   time.Time
+	factory            k8s.ValidationFactory
+	arguments          *Arguments
+	clusterWaitGroup   sync.WaitGroup // Wait group for clusters destroying
 }
 
 // CloudTestRun - CloudTestRun
@@ -255,15 +256,16 @@ func importFiles(testConfig *config.CloudTestConfig, files ...string) error {
 // PerformTesting performs testing uses cloud test config. Returns the junit report when testing finished.
 func PerformTesting(config *config.CloudTestConfig, factory k8s.ValidationFactory, arguments *Arguments) (*reporting.JUnitFile, error) {
 	ctx := &executionContext{
-		cloudTestConfig:  config,
-		operationChannel: make(chan operationEvent, 100),
-		tasks:            []*testTask{},
-		running:          map[string]*testTask{},
-		completed:        []*testTask{},
-		tests:            []*model.TestEntry{},
-		factory:          factory,
-		arguments:        arguments,
-		manager:          execmanager.NewExecutionManager(config.ConfigRoot),
+		cloudTestConfig:    config,
+		operationChannel:   make(chan operationEvent, 100),
+		terminationChannel: make(chan error, 10),
+		tasks:              []*testTask{},
+		running:            map[string]*testTask{},
+		completed:          []*testTask{},
+		tests:              []*model.TestEntry{},
+		factory:            factory,
+		arguments:          arguments,
+		manager:            execmanager.NewExecutionManager(config.ConfigRoot),
 	}
 	return performTestingContext(ctx)
 }
@@ -395,9 +397,8 @@ func (ctx *executionContext) pollEvents(c context.Context, osCh <-chan os.Signal
 		if ctx.cloudTestConfig.Statistics.Enabled {
 			ctx.printStatistics()
 		}
-		if ctx.cloudTestConfig.FailedTestsLimit != 0 && stat.failedTests >= ctx.cloudTestConfig.FailedTestsLimit {
-			return errors.New("failed tests limit is reached")
-		}
+	case err := <-ctx.terminationChannel:
+		return err
 	}
 	return nil
 }
@@ -528,6 +529,15 @@ func (ctx *executionContext) completeTask(event operationEvent) {
 	ctx.Lock()
 	delete(ctx.running, event.task.taskID)
 	ctx.completed = append(ctx.completed, event.task)
+	failedTests := 0
+	for _, t := range ctx.completed {
+		if t.test.Status == model.StatusFailed {
+			failedTests++
+		}
+	}
+	if ctx.cloudTestConfig.FailedTestsLimit != 0 && failedTests >= ctx.cloudTestConfig.FailedTestsLimit {
+		ctx.terminationChannel <- errors.Errorf("failed tests limit is reached: %d", ctx.cloudTestConfig.FailedTestsLimit)
+	}
 	ctx.Unlock()
 	ctx.makeInstancesReady(event.task.clusterInstances)
 }
