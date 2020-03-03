@@ -259,7 +259,7 @@ func PerformTesting(config *config.CloudTestConfig, factory k8s.ValidationFactor
 	ctx := &executionContext{
 		cloudTestConfig:    config,
 		operationChannel:   make(chan operationEvent, 100),
-		terminationChannel: make(chan error, 10),
+		terminationChannel: make(chan error, 100),
 		tasks:              []*testTask{},
 		running:            map[string]*testTask{},
 		completed:          []*testTask{},
@@ -354,7 +354,7 @@ func (ctx *executionContext) performExecution() error {
 	if ctx.cloudTestConfig.Statistics.Enabled && ctx.cloudTestConfig.Statistics.Interval > 0 {
 		statsTimeout = time.Duration(ctx.cloudTestConfig.Statistics.Interval) * time.Second
 	}
-	healthCheckChannel := RunHealthChecks(ctx.cloudTestConfig.HealthCheck)
+	RunHealthChecks(ctx.cloudTestConfig.HealthCheck, ctx.terminationChannel)
 	termChannel := utils.NewOSSignalChannel()
 	statTicker := time.NewTicker(statsTimeout)
 	defer statTicker.Stop()
@@ -364,7 +364,7 @@ func (ctx *executionContext) performExecution() error {
 		ctx.assignTasks()
 		ctx.checkClustersUsage()
 
-		if err := ctx.pollEvents(timeoutCtx, termChannel, healthCheckChannel, statTicker.C); err != nil {
+		if err := ctx.pollEvents(timeoutCtx, termChannel, statTicker.C); err != nil {
 			return err
 		}
 		ctx.Lock()
@@ -378,7 +378,7 @@ func (ctx *executionContext) performExecution() error {
 	return nil
 }
 
-func (ctx *executionContext) pollEvents(c context.Context, osCh <-chan os.Signal, healthCh <-chan error, statsCh <-chan time.Time) error {
+func (ctx *executionContext) pollEvents(c context.Context, osCh <-chan os.Signal, statsCh <-chan time.Time) error {
 	select {
 	case event := <-ctx.operationChannel:
 		switch event.kind {
@@ -392,14 +392,12 @@ func (ctx *executionContext) pollEvents(c context.Context, osCh <-chan os.Signal
 		return errors.New("termination request is received")
 	case <-c.Done():
 		return errors.Errorf("global timeout elapsed: %v seconds", ctx.cloudTestConfig.Timeout)
-	case err := <-healthCh:
-		return errors.Wrapf(err, "health check probe failed")
+	case err := <-ctx.terminationChannel:
+		return err
 	case <-statsCh:
 		if ctx.cloudTestConfig.Statistics.Enabled {
 			ctx.printStatistics()
 		}
-	case err := <-ctx.terminationChannel:
-		return err
 	}
 	return nil
 }
