@@ -259,7 +259,7 @@ func PerformTesting(config *config.CloudTestConfig, factory k8s.ValidationFactor
 	ctx := &executionContext{
 		cloudTestConfig:    config,
 		operationChannel:   make(chan operationEvent, 100),
-		terminationChannel: make(chan error, 100),
+		terminationChannel: make(chan error, utils.Max(10, len(config.HealthCheck))),
 		tasks:              []*testTask{},
 		running:            map[string]*testTask{},
 		completed:          []*testTask{},

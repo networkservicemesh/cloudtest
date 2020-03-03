@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Cisco Systems, Inc and/or its affiliates.
+// Copyright (c) 2019-2020 Cisco Systems, Inc and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -238,4 +238,11 @@ func (v EnvVar) StringValue() string {
 //Name returns emv variable name
 func (v EnvVar) Name() string {
 	return string(v)
+}
+
+func Max(x, y int) int {
+	if x > y {
+		return x
+	}
+	return y
 }
