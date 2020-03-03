@@ -79,15 +79,3 @@ func TestPassedTestsNotAffected(t *testing.T) {
 	g.Expect(report).ShouldNot(BeNil())
 	g.Expect(report.Suites[0].Failures).To(Equal(0))
 }
-
-func TestNumberOfTestsIsLessThanLimit(t *testing.T) {
-	g := NewWithT(t)
-	failedTestLimit := 11
-	testConfig := testConfig(failedTestLimit, &config.ExecutionSource{
-		Tags: []string{"failed", "passed"},
-	})
-	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err).ShouldNot(BeNil())
-	g.Expect(err.Error()).To(Equal(fmt.Sprintf("number of tests is less than the failed tests limit")))
-	g.Expect(report).Should(BeNil())
-}

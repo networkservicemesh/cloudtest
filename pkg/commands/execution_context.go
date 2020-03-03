@@ -1397,7 +1397,7 @@ func (ctx *executionContext) findTests() error {
 		return errors.New("there is no tests defined")
 	}
 	if len(ctx.tests) < ctx.cloudTestConfig.FailedTestsLimit {
-		return errors.New("number of tests is less than the failed tests limit")
+		logrus.Warning("number of tests is less than the failed tests limit")
 	}
 	return nil
 }
