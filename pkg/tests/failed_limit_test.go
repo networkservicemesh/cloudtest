@@ -24,10 +24,7 @@ import (
 	"testing"
 )
 
-func TestTerminateTestingAfterFailuresLimitReached(t *testing.T) {
-	g := NewWithT(t)
-	failedTestLimit := 2
-
+func testConfig(failedTestLimit int, source *config.ExecutionSource) *config.CloudTestConfig {
 	testConfig := &config.CloudTestConfig{}
 	testConfig.Timeout = 300
 	testConfig.FailedTestsLimit = failedTestLimit
@@ -37,15 +34,58 @@ func TestTerminateTestingAfterFailuresLimitReached(t *testing.T) {
 		Name:        "simple",
 		Timeout:     2,
 		PackageRoot: "./sample",
-		Source: config.ExecutionSource{
-			Tags: []string{"failed_limit"},
-		},
+		Source:      *source,
 	}}
 	testConfig.Reporting.JUnitReportFile = JunitReport
+	return testConfig
+}
 
+func TestTerminateTestingWhenLimitReached(t *testing.T) {
+	g := NewWithT(t)
+	failedTestLimit := 3
+	testConfig := testConfig(failedTestLimit, &config.ExecutionSource{
+		Tags: []string{"failed", "passed"},
+	})
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
 	g.Expect(err).ShouldNot(BeNil())
 	g.Expect(err.Error()).To(Equal(fmt.Sprintf("failed tests limit is reached: %d", failedTestLimit)))
 	g.Expect(report).ShouldNot(BeNil())
 	g.Expect(report.Suites[0].Failures).To(Equal(failedTestLimit))
+}
+
+func TestTerminateTestingWhenLimitReachedFailedOnly(t *testing.T) {
+	g := NewWithT(t)
+	failedTestLimit := 3
+	testConfig := testConfig(failedTestLimit, &config.ExecutionSource{
+		Tags: []string{"failed"},
+	})
+	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
+	g.Expect(err).ShouldNot(BeNil())
+	g.Expect(err.Error()).To(Equal(fmt.Sprintf("failed tests limit is reached: %d", failedTestLimit)))
+	g.Expect(report).ShouldNot(BeNil())
+	g.Expect(report.Suites[0].Failures).To(Equal(failedTestLimit))
+}
+
+func TestPassedTestsNotAffected(t *testing.T) {
+	g := NewWithT(t)
+	failedTestLimit := 2
+	testConfig := testConfig(failedTestLimit, &config.ExecutionSource{
+		Tags: []string{"passed"},
+	})
+	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
+	g.Expect(err).Should(BeNil())
+	g.Expect(report).ShouldNot(BeNil())
+	g.Expect(report.Suites[0].Failures).To(Equal(0))
+}
+
+func TestNumberOfTestsIsLessThanLimit(t *testing.T) {
+	g := NewWithT(t)
+	failedTestLimit := 11
+	testConfig := testConfig(failedTestLimit, &config.ExecutionSource{
+		Tags: []string{"failed", "passed"},
+	})
+	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
+	g.Expect(err).ShouldNot(BeNil())
+	g.Expect(err.Error()).To(Equal(fmt.Sprintf("number of tests is less than the failed tests limit")))
+	g.Expect(report).Should(BeNil())
 }

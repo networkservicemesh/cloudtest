@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build failed_limit
+// +build failed
 
 package sample
 
@@ -23,18 +23,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 )
-
-func TestPass1(t *testing.T) {
-	logrus.Infof("Passed test")
-}
-
-func TestPass2(t *testing.T) {
-	logrus.Infof("Passed test")
-}
-
-func TestPass3(t *testing.T) {
-	logrus.Infof("Passed test")
-}
 
 func TestFail1(t *testing.T) {
 	logrus.Infof("Failed test")
@@ -47,6 +35,16 @@ func TestFail2(t *testing.T) {
 }
 
 func TestFail3(t *testing.T) {
+	logrus.Infof("Failed test")
+	t.FailNow()
+}
+
+func TestFail4(t *testing.T) {
+	logrus.Infof("Failed test")
+	t.FailNow()
+}
+
+func TestFail5(t *testing.T) {
 	logrus.Infof("Failed test")
 	t.FailNow()
 }
