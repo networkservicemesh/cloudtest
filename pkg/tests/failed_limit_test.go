@@ -18,10 +18,12 @@ package tests
 
 import (
 	"fmt"
+	"testing"
+
+	. "github.com/onsi/gomega"
+
 	"github.com/networkservicemesh/cloudtest/pkg/commands"
 	"github.com/networkservicemesh/cloudtest/pkg/config"
-	. "github.com/onsi/gomega"
-	"testing"
 )
 
 func testConfig(failedTestLimit int, source *config.ExecutionSource) *config.CloudTestConfig {
