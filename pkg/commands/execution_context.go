@@ -144,7 +144,7 @@ type executionContext struct {
 	running            map[string]*testTask
 	completed          []*testTask
 	skipped            []*testTask
-	failedNumber       int
+	failedTestsCount   int
 	cloudTestConfig    *config.CloudTestConfig
 	report             *reporting.JUnitFile
 	startTime          time.Time
@@ -529,9 +529,9 @@ func (ctx *executionContext) completeTask(event operationEvent) {
 	delete(ctx.running, event.task.taskID)
 	ctx.completed = append(ctx.completed, event.task)
 	if event.task.test.Status == model.StatusFailed {
-		ctx.failedNumber++
+		ctx.failedTestsCount++
 	}
-	if ctx.cloudTestConfig.FailedTestsLimit != 0 && ctx.failedNumber == ctx.cloudTestConfig.FailedTestsLimit {
+	if ctx.cloudTestConfig.FailedTestsLimit != 0 && ctx.failedTestsCount == ctx.cloudTestConfig.FailedTestsLimit {
 		ctx.terminationChannel <- errors.Errorf("failed tests limit is reached: %d", ctx.cloudTestConfig.FailedTestsLimit)
 	}
 	ctx.Unlock()
