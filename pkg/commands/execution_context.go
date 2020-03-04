@@ -1621,7 +1621,7 @@ func (ctx *executionContext) generateTestCaseReport(test *testTask, totalTests i
 				logrus.Errorf("Failed to read stored output %v", ex.OutputFile)
 				lines = []string{"Failed to read stored output:", ex.OutputFile, err.Error()}
 			}
-			result.WriteString(fmt.Sprintf("Execution attempt: %v Output file: %v", idx, ex.OutputFile))
+			result.WriteString(fmt.Sprintf("Execution attempt: %v Output file: %v\n", idx, ex.OutputFile))
 			result.WriteString(strings.Join(lines, "\n"))
 		}
 		testCase.Failure = &reporting.Failure{
