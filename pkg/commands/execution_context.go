@@ -532,7 +532,7 @@ func (ctx *executionContext) completeTask(event operationEvent) {
 		ctx.failedTestsCount++
 	}
 	if ctx.cloudTestConfig.FailedTestsLimit != 0 && ctx.failedTestsCount == ctx.cloudTestConfig.FailedTestsLimit {
-		ctx.terminationChannel <- errors.Errorf("failed tests limit is reached: %d", ctx.cloudTestConfig.FailedTestsLimit)
+		ctx.terminationChannel <- errors.Errorf("Allowed limit for failed tests is reached: %d", ctx.cloudTestConfig.FailedTestsLimit)
 	}
 	ctx.Unlock()
 	ctx.makeInstancesReady(event.task.clusterInstances)
@@ -1395,9 +1395,6 @@ func (ctx *executionContext) findTests() error {
 	logrus.Infof("Total tests found: %v", len(ctx.tests))
 	if len(ctx.tests) == 0 {
 		return errors.New("there is no tests defined")
-	}
-	if len(ctx.tests) < ctx.cloudTestConfig.FailedTestsLimit {
-		logrus.Warning("number of tests is less than the failed tests limit")
 	}
 	return nil
 }
