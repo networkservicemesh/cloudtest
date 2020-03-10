@@ -50,7 +50,7 @@ func TestTerminateTestingWhenLimitReached(t *testing.T) {
 	})
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
 	g.Expect(err).ShouldNot(BeNil())
-	g.Expect(err.Error()).To(Equal(fmt.Sprintf("failed tests limit is reached: %d", failedTestLimit)))
+	g.Expect(err.Error()).To(Equal(fmt.Sprintf("Allowed limit for failed tests is reached: %d", failedTestLimit)))
 	g.Expect(report).ShouldNot(BeNil())
 	g.Expect(report.Suites[0].Failures).To(Equal(failedTestLimit))
 }
@@ -63,7 +63,7 @@ func TestTerminateTestingWhenLimitReachedFailedOnly(t *testing.T) {
 	})
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
 	g.Expect(err).ShouldNot(BeNil())
-	g.Expect(err.Error()).To(Equal(fmt.Sprintf("failed tests limit is reached: %d", failedTestLimit)))
+	g.Expect(err.Error()).To(Equal(fmt.Sprintf("Allowed limit for failed tests is reached: %d", failedTestLimit)))
 	g.Expect(report).ShouldNot(BeNil())
 	g.Expect(report.Suites[0].Failures).To(Equal(failedTestLimit))
 }
