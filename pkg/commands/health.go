@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Cisco Systems, Inc and/or its affiliates.
+// Copyright (c) 2019-2020 Cisco Systems, Inc and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -29,8 +29,7 @@ import (
 )
 
 // RunHealthChecks - Start goroutines with health check probes
-func RunHealthChecks(checkConfigs []*config.HealthCheckConfig) <-chan error {
-	errCh := make(chan error, len(checkConfigs))
+func RunHealthChecks(checkConfigs []*config.HealthCheckConfig, errCh chan<- error) {
 	for i := range checkConfigs {
 		go func(c int) {
 			ready := true
@@ -47,13 +46,11 @@ func RunHealthChecks(checkConfigs []*config.HealthCheckConfig) <-chan error {
 					_, err := utils.RunCommand(timeoutCtx, cmd, "", func(s string) {}, bufio.NewWriter(builder), nil, nil, false)
 					if ready && err != nil {
 						ready = false
-						errCh <- errors.Errorf(config.Message)
+						errCh <- errors.Wrapf(errors.Errorf(config.Message), "health check probe failed")
 						return
 					}
 				}
 			}
 		}(i)
 	}
-
-	return errCh
 }

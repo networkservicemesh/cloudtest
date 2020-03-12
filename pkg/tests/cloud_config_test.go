@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Cisco Systems, Inc and/or its affiliates.
+// Copyright (c) 2019-2020 Cisco Systems, Inc and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -55,7 +55,8 @@ func TestClusterHealthCheckConfig(t *testing.T) {
 	g.Expect(len(testConfig.Providers)).To(Equal(3))
 	g.Expect(testConfig.Reporting.JUnitReportFile).To(Equal("./.tests/junit.xml"))
 
-	errChan := commands.RunHealthChecks(testConfig.HealthCheck)
+	errChan := make(chan error, len(testConfig.HealthCheck))
+	commands.RunHealthChecks(testConfig.HealthCheck, errChan)
 
 	select {
 	case err = <-errChan:

@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Cisco Systems, Inc and/or its affiliates.
+// Copyright (c) 2019-2020 Cisco Systems, Inc and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -57,13 +57,14 @@ func TestUpdateTaskWithTimeout_ShouldNotCompleteTask(t *testing.T) {
 		},
 	}
 	statsTimeout := time.Minute
-	healthCheckChannel := RunHealthChecks(ctx.cloudTestConfig.HealthCheck)
+	ctx.terminationChannel = make(chan error, len(ctx.cloudTestConfig.HealthCheck))
+	RunHealthChecks(ctx.cloudTestConfig.HealthCheck, ctx.terminationChannel)
 	termChannel := utils.NewOSSignalChannel()
 	statTicker := time.NewTicker(statsTimeout)
 	defer statTicker.Stop()
 
 	ctx.tasks = append(ctx.tasks, task)
 	ctx.updateTestExecution(task, "", model.StatusTimeout)
-	_ = ctx.pollEvents(context.Background(), termChannel, healthCheckChannel, statTicker.C)
+	_ = ctx.pollEvents(context.Background(), termChannel, statTicker.C)
 	assert.Expect(len(ctx.completed)).Should(gomega.BeZero())
 }
