@@ -941,13 +941,15 @@ func (ctx *executionContext) executeTask(task *testTask, clusterConfigs []string
 			logrus.Infof(msg)
 			_, _ = writer.WriteString(msg + "\n")
 			_ = writer.Flush()
-
+			dir := task.test.ArtifactDirectories[len(task.test.ArtifactDirectories)-1]
 			onFailErr := ctx.handleScript(&runScriptArgs{
 				Name:          "OnFail",
 				ClusterTaskId: task.clusterTaskID,
 				Script:        task.test.ExecutionConfig.OnFail,
-				Env:           append(task.test.ExecutionConfig.Env, fmt.Sprintf("KUBECONFIG=%v", cfg)),
-				Out:           writer,
+				Env: append(task.test.ExecutionConfig.Env,
+					fmt.Sprintf("KUBECONFIG=%v", cfg),
+					fmt.Sprintf("ARTIFACTS_DIR=%v", dir)),
+				Out: writer,
 			})
 			if onFailErr != nil {
 				errCode = errors.Wrap(errCode, onFailErr.Error())
