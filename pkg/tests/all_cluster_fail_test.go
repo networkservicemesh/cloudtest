@@ -198,7 +198,7 @@ func TestClusterInstancesOnFailShellRunner(t *testing.T) {
 		Kind:    "shell",
 		Run:     "make_all_happy()",
 		Env:     []string{"name=$(test-name)"},
-		OnFail:  `echo >>>Running on fail script name=${name}<<<`,
+		OnFail:  `echo >>>Running on fail script name=${name}, artifacts dir=${ARTIFACTS_DIR}<<< `,
 	})
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
@@ -210,7 +210,8 @@ func TestClusterInstancesOnFailShellRunner(t *testing.T) {
 		testCase := executionSuite.Suites[0].TestCases[0]
 		if executionSuite.Name == "fail" {
 			g.Expect(testCase.Failure).NotTo(BeNil())
-			g.Expect(strings.Contains(testCase.Failure.Contents, ">>>Running on fail script name=OnFail<<<")).To(Equal(true))
+			g.Expect(testCase.Failure.Contents).Should(ContainSubstring(">>>Running on fail script name=OnFail, artifacts dir="))
+			g.Expect(testCase.Failure.Contents).Should(ContainSubstring("fail<<<"))
 			foundFailTest = true
 		} else {
 			g.Expect(testCase.Failure).Should(BeNil())

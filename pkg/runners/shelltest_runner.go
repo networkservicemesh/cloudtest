@@ -1,4 +1,6 @@
-// Copyright (c) 2019 Cisco Systems, Inc and/or its affiliates.
+// Copyright (c) 2020 Doc.ai, Inc and/or its affiliates.
+//
+// Copyright (c) 2019-2020 Cisco Systems, Inc and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -29,10 +31,9 @@ import (
 )
 
 type shellTestRunner struct {
-	test        *model.TestEntry
-	envMgr      shell.EnvironmentManager
-	artifactDir string
-	id          string
+	test   *model.TestEntry
+	envMgr shell.EnvironmentManager
+	id     string
 }
 
 func (runner *shellTestRunner) Run(timeoutCtx context.Context, env []string, writer *bufio.Writer) error {
@@ -47,7 +48,6 @@ func (runner *shellTestRunner) runCmd(context context.Context, script, env []str
 		}
 
 		cmdEnv := append(runner.envMgr.GetProcessedEnv(), env...)
-		cmdEnv = append(cmdEnv, "ARTIFACTS_DIR="+runner.artifactDir)
 		_, _ = writer.WriteString(fmt.Sprintf(">>>>>>Running: %s:<<<<<<\n", cmd))
 		_ = writer.Flush()
 
@@ -71,14 +71,9 @@ func (runner *shellTestRunner) GetCmdLine() string {
 func NewShellTestRunner(ids string, test *model.TestEntry) TestRunner {
 	envMgr := shell.NewEnvironmentManager()
 	_ = envMgr.ProcessEnvironment(ids, "shellrun", os.TempDir(), test.ExecutionConfig.Env, map[string]string{})
-	artifactDir := ""
-	if len(test.ArtifactDirectories) > 0 {
-		artifactDir = test.ArtifactDirectories[len(test.ArtifactDirectories)-1]
-	}
 	return &shellTestRunner{
-		id:          ids,
-		test:        test,
-		envMgr:      envMgr,
-		artifactDir: artifactDir,
+		id:     ids,
+		test:   test,
+		envMgr: envMgr,
 	}
 }
