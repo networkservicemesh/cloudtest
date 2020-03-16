@@ -866,6 +866,28 @@ func (ctx *executionContext) startTask(task *testTask, instances []*clusterInsta
 	return nil
 }
 
+func prepareEnv(task *testTask, clusterConfigs ...string) []string {
+	var env []string
+	// Fill Kubernetes environment variables.
+	if len(task.test.ExecutionConfig.ClusterEnv) > 0 &&
+		len(task.test.ExecutionConfig.ClusterEnv) == len(clusterConfigs) {
+		for ind, envV := range task.test.ExecutionConfig.ClusterEnv {
+			env = append(env, fmt.Sprintf("%s=%s", envV, clusterConfigs[ind]))
+		}
+	} else {
+		for idx, cfg := range clusterConfigs {
+			if idx == 0 {
+				env = append(env, fmt.Sprintf("KUBECONFIG=%s", cfg))
+			} else {
+				env = append(env, fmt.Sprintf("KUBECONFIG%d=%s", idx, cfg))
+			}
+		}
+	}
+	dir := task.test.ArtifactDirectories[len(task.test.ArtifactDirectories)-1]
+	env = append(env, fmt.Sprintf("ARTIFACTS_DIR=%v", dir))
+	return env
+}
+
 func (ctx *executionContext) executeTask(task *testTask, clusterConfigs []string, file io.Writer, runner runners.TestRunner, timeout time.Duration, instances []*clusterInstance, fileName string) {
 	testDelay := func() int {
 		first := true
@@ -894,22 +916,7 @@ func (ctx *executionContext) executeTask(task *testTask, clusterConfigs []string
 	}
 
 	st := time.Now()
-	var env []string
-
-	// Fill Kubernetes environment variables.
-	if len(task.test.ExecutionConfig.ClusterEnv) > 0 {
-		for ind, envV := range task.test.ExecutionConfig.ClusterEnv {
-			env = append(env, fmt.Sprintf("%s=%s", envV, clusterConfigs[ind]))
-		}
-	} else {
-		for idx, cfg := range clusterConfigs {
-			if idx == 0 {
-				env = append(env, fmt.Sprintf("KUBECONFIG=%s", cfg))
-			} else {
-				env = append(env, fmt.Sprintf("KUBECONFIG%d=%s", idx, cfg))
-			}
-		}
-	}
+	env := prepareEnv(task, clusterConfigs...)
 
 	writer := bufio.NewWriter(file)
 	msg := fmt.Sprintf("Starting %s on %v\n", task.test.Name, task.clusterTaskID)
@@ -941,15 +948,12 @@ func (ctx *executionContext) executeTask(task *testTask, clusterConfigs []string
 			logrus.Infof(msg)
 			_, _ = writer.WriteString(msg + "\n")
 			_ = writer.Flush()
-			dir := task.test.ArtifactDirectories[len(task.test.ArtifactDirectories)-1]
 			onFailErr := ctx.handleScript(&runScriptArgs{
 				Name:          "OnFail",
 				ClusterTaskId: task.clusterTaskID,
 				Script:        task.test.ExecutionConfig.OnFail,
-				Env: append(task.test.ExecutionConfig.Env,
-					fmt.Sprintf("KUBECONFIG=%v", cfg),
-					fmt.Sprintf("ARTIFACTS_DIR=%v", dir)),
-				Out: writer,
+				Env:           append(task.test.ExecutionConfig.Env, prepareEnv(task, cfg)...),
+				Out:           writer,
 			})
 			if onFailErr != nil {
 				errCode = errors.Wrap(errCode, onFailErr.Error())
