@@ -45,7 +45,6 @@ func RunHealthChecks(checkConfigs []*config.HealthCheckConfig, errCh chan<- erro
 					builder := &strings.Builder{}
 					_, err := utils.RunCommand(timeoutCtx, cmd, "", func(s string) {}, bufio.NewWriter(builder), nil, nil, false)
 					if ready && err != nil {
-						ready = false
 						errCh <- errors.Wrapf(errors.Errorf(config.Message), "health check probe failed")
 						return
 					}

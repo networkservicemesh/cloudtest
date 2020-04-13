@@ -435,7 +435,6 @@ func (ctx *executionContext) assignTasks() {
 			err := ctx.startTask(task, assignedClusters)
 			if err != nil {
 				logrus.Errorf("Error starting task  %s on %s: %v", task.test.Name, task.clusterTaskID, err)
-				canRun = false
 			} else {
 				ctx.running[task.taskID] = task
 			}

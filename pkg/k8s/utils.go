@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Cisco Systems, Inc and/or its affiliates.
+// Copyright (c) 2019-2020 Cisco Systems, Inc and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -17,6 +17,8 @@
 package k8s
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -46,7 +48,7 @@ func NewK8sUtils(configPath string) (*Utils, error) {
 
 // GetNodes - return a list of kubernetes nodes.
 func (u *Utils) GetNodes() ([]v1.Node, error) {
-	nodes, err := u.clientset.CoreV1().Nodes().List(v12.ListOptions{})
+	nodes, err := u.clientset.CoreV1().Nodes().List(context.TODO(), v12.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
