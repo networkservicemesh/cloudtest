@@ -1,6 +1,6 @@
 module github.com/networkservicemesh/cloudtest
 
-go 1.13
+go 1.15
 
 require (
 	github.com/google/uuid v1.1.1
@@ -9,7 +9,6 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v1.0.0
-	golang.org/x/sys v0.0.0-20200117145432-59e60aa80a0c // indirect
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.18.1
 	k8s.io/apimachinery v0.18.1
