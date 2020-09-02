@@ -18,8 +18,9 @@ package tests
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/networkservicemesh/cloudtest/pkg/commands"
 	"github.com/networkservicemesh/cloudtest/pkg/config"

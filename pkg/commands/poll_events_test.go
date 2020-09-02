@@ -18,11 +18,12 @@ package commands
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/networkservicemesh/cloudtest/pkg/utils"
 

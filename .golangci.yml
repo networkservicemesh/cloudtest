@@ -30,7 +30,7 @@ linters-settings:
   golint:
     min-confidence: 0.8
   goimports:
-    local-prefixes: github.com/networkservicemesh/sdk
+    local-prefixes: github.com/networkservicemesh/cloudtest
   gocyclo:
     min-complexity: 15
   maligned:

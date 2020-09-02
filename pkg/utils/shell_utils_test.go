@@ -20,10 +20,11 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestProcessOutputShouldNotLostOutput(t *testing.T) {

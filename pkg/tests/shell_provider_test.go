@@ -17,11 +17,12 @@
 package tests
 
 import (
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/sirupsen/logrus"
 
@@ -392,7 +393,7 @@ func TestMultiClusterTest(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	require.Contains(t, err.Error(), "there is failed tests 3")
+	require.Equal(t, "there is failed tests 3", err.Error())
 
 	require.NotNil(t, report)
 

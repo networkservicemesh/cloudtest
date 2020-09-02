@@ -3,9 +3,10 @@
 package sample
 
 import (
-	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/sirupsen/logrus"
 )
@@ -15,9 +16,8 @@ func TestInterDomainPass(t *testing.T) {
 }
 
 func TestInterdomainCheck(t *testing.T) {
-	g := NewWithT(t)
-
 	require.NotEmpty(t, os.Getenv("CFG1"))
+	require.NotEmpty(t, os.Getenv("CFG2"))
 }
 func TestInterdomainFail(t *testing.T) {
 	logrus.Infof("Failed test")

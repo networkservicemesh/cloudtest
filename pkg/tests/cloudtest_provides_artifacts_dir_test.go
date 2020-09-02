@@ -17,11 +17,12 @@
 package tests
 
 import (
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/networkservicemesh/cloudtest/pkg/commands"
 	"github.com/networkservicemesh/cloudtest/pkg/config"

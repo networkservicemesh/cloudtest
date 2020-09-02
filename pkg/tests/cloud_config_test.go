@@ -17,10 +17,11 @@
 package tests
 
 import (
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"gopkg.in/yaml.v2"
 

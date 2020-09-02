@@ -17,10 +17,11 @@
 package commands
 
 import (
-	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"io/ioutil"
 
