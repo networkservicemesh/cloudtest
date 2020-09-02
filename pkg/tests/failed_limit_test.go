@@ -18,9 +18,8 @@ package tests
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"testing"
-
-	. "github.com/onsi/gomega"
 
 	"github.com/networkservicemesh/cloudtest/pkg/commands"
 	"github.com/networkservicemesh/cloudtest/pkg/config"
@@ -43,39 +42,36 @@ func testConfig(failedTestLimit int, source *config.ExecutionSource) *config.Clo
 }
 
 func TestTerminateTestingWhenLimitReached(t *testing.T) {
-	g := NewWithT(t)
 	failedTestLimit := 3
 	testConfig := testConfig(failedTestLimit, &config.ExecutionSource{
 		Tags: []string{"failed", "passed"},
 	})
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err).ShouldNot(BeNil())
-	g.Expect(err.Error()).To(Equal(fmt.Sprintf("Allowed limit for failed tests is reached: %d", failedTestLimit)))
-	g.Expect(report).ShouldNot(BeNil())
-	g.Expect(report.Suites[0].Failures).To(Equal(failedTestLimit))
+	require.Error(t, err)
+	require.Equal(t, fmt.Sprintf("Allowed limit for failed tests is reached: %d", failedTestLimit), err.Error())
+	require.NotNil(t, report)
+	require.Equal(t, failedTestLimit, report.Suites[0].Failures)
 }
 
 func TestTerminateTestingWhenLimitReachedFailedOnly(t *testing.T) {
-	g := NewWithT(t)
 	failedTestLimit := 3
 	testConfig := testConfig(failedTestLimit, &config.ExecutionSource{
 		Tags: []string{"failed"},
 	})
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err).ShouldNot(BeNil())
-	g.Expect(err.Error()).To(Equal(fmt.Sprintf("Allowed limit for failed tests is reached: %d", failedTestLimit)))
-	g.Expect(report).ShouldNot(BeNil())
-	g.Expect(report.Suites[0].Failures).To(Equal(failedTestLimit))
+	require.Error(t, err)
+	require.Equal(t, fmt.Sprintf("Allowed limit for failed tests is reached: %d", failedTestLimit), err.Error())
+	require.NotNil(t, report)
+	require.Equal(t, failedTestLimit, report.Suites[0].Failures)
 }
 
 func TestPassedTestsNotAffected(t *testing.T) {
-	g := NewWithT(t)
 	failedTestLimit := 2
 	testConfig := testConfig(failedTestLimit, &config.ExecutionSource{
 		Tags: []string{"passed"},
 	})
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err).Should(BeNil())
-	g.Expect(report).ShouldNot(BeNil())
-	g.Expect(report.Suites[0].Failures).To(Equal(0))
+	require.NoError(t, err)
+	require.NotNil(t, report)
+	require.Equal(t, 0, report.Suites[0].Failures)
 }

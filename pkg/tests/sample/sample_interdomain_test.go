@@ -3,28 +3,24 @@
 package sample
 
 import (
+	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
 
-	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 )
 
 func TestInterDomainPass(t *testing.T) {
-	NewWithT(t)
 	logrus.Infof("Passed test")
 }
 
 func TestInterdomainCheck(t *testing.T) {
 	g := NewWithT(t)
 
-	g.Expect(len(os.Getenv("CFG1")) != 0).To(Equal(true))
-	g.Expect(len(os.Getenv("CFG1")) != 0).To(Equal(true))
+	require.NotEmpty(t, os.Getenv("CFG1"))
 }
 func TestInterdomainFail(t *testing.T) {
-	g := NewWithT(t)
-
 	logrus.Infof("Failed test")
 
-	g.Expect("fail").To(Equal("success"))
+	t.FailNow()
 }

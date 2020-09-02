@@ -17,41 +17,37 @@
 package commands
 
 import (
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"testing"
 
 	"github.com/networkservicemesh/cloudtest/pkg/config"
-
-	"github.com/onsi/gomega"
 )
 
 func TestImportAll(t *testing.T) {
-	g := gomega.NewWithT(t)
 	testConfig := &config.CloudTestConfig{
 		Imports: []string{"samples/.*"},
 	}
 	err := performImport(testConfig)
-	g.Expect(err).Should(gomega.BeNil())
+	require.Nil(t, err)
 	files, _ := ioutil.ReadDir(testConfig.Imports[0][:len(testConfig.Imports[0])-1])
-	g.Expect(len(testConfig.Executions) == len(files)).Should(gomega.BeTrue())
+	require.Len(t, files, len(testConfig.Executions))
 }
 
 func TestImportPattern(t *testing.T) {
-	g := gomega.NewWithT(t)
 	testConfig := &config.CloudTestConfig{
 		Imports: []string{"samples/.*2"},
 	}
 	err := performImport(testConfig)
-	g.Expect(err).Should(gomega.BeNil())
-	g.Expect(len(testConfig.Executions)).Should(gomega.Equal(1))
+	require.Nil(t, err)
+	require.Len(t, testConfig.Executions, 1)
 }
 
 func TestSpecificImport(t *testing.T) {
-	g := gomega.NewWithT(t)
 	testConfig := &config.CloudTestConfig{
 		Imports: []string{"samples/execution1.yaml"},
 	}
 	err := performImport(testConfig)
-	g.Expect(err).Should(gomega.BeNil())
-	g.Expect(len(testConfig.Executions)).Should(gomega.Equal(1))
+	require.Nil(t, err)
+	require.Len(t, testConfig.Executions, 1)
 }

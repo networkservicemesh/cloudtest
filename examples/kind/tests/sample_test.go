@@ -21,7 +21,6 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 )
 
@@ -30,11 +29,9 @@ func TestPass(t *testing.T) {
 }
 
 func TestFail(t *testing.T) {
-	g := NewWithT(t)
-
 	logrus.Infof("Failed test: " + os.Getenv("KUBECONFIG"))
 
-	g.Expect("fail").To(Equal("success"))
+	t.FailNow()
 }
 
 func TestTimeout(t *testing.T) {

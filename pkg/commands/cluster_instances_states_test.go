@@ -17,13 +17,12 @@
 package commands
 
 import (
+	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
 	"time"
 
 	"io/ioutil"
-
-	. "github.com/onsi/gomega"
 
 	"github.com/networkservicemesh/cloudtest/pkg/config"
 	"github.com/networkservicemesh/cloudtest/pkg/execmanager"
@@ -32,10 +31,9 @@ import (
 )
 
 func TestClusterInstanceStates(t *testing.T) {
-	g := NewWithT(t)
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), t.Name())
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 	defer utils.ClearFolder(tmpDir, false)
 
 	testConfig := config.NewCloudTestConfig()
@@ -69,35 +67,35 @@ func TestClusterInstanceStates(t *testing.T) {
 	ctx.cloudTestConfig.Statistics.Enabled = false
 
 	err = ctx.createClusters()
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
-	g.Expect(len(ctx.clusters)).To(BeEquivalentTo(2))
-	g.Expect(len(ctx.clusters[0].instances)).To(BeEquivalentTo(1))
+	require.Len(t, ctx.clusters, 2)
+	require.Len(t, ctx.clusters[0].instances, 1)
 	ctx.startCluster(ctx.clusters[0].instances[0])
 	ctx.startCluster(ctx.clusters[1].instances[0])
 
 	<-time.After(100 * time.Millisecond)
 
 	ctx.Lock()
-	g.Expect(ctx.clusters[0].instances[0].state).To(BeEquivalentTo(clusterReady))
-	g.Expect(ctx.clusters[1].instances[0].state).To(BeEquivalentTo(clusterCrashed))
+	require.Equal(t, ctx.clusters[0].instances[0].state, clusterReady)
+	require.Equal(t, ctx.clusters[1].instances[0].state, clusterCrashed)
 
 	ctx.clusters[0].instances[0].state = clusterStarting
 	ctx.Unlock()
 
 	err = ctx.destroyCluster(ctx.clusters[0].instances[0], false, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	ctx.Lock()
-	g.Expect(ctx.clusters[0].instances[0].state).To(BeEquivalentTo(clusterStarting))
+	require.Equal(t, ctx.clusters[0].instances[0].state, clusterStarting)
 
 	ctx.clusters[0].instances[0].state = clusterStopping
 	ctx.Unlock()
 
 	err = ctx.destroyCluster(ctx.clusters[0].instances[0], false, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 	ctx.Lock()
-	g.Expect(ctx.clusters[0].instances[0].state).To(BeEquivalentTo(clusterCrashed))
+	require.Equal(t, ctx.clusters[0].instances[0].state, clusterCrashed)
 	ctx.Unlock()
 }
 

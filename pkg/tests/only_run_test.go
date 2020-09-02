@@ -17,6 +17,7 @@
 package tests
 
 import (
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -24,18 +25,15 @@ import (
 	"github.com/networkservicemesh/cloudtest/pkg/config"
 	"github.com/networkservicemesh/cloudtest/pkg/utils"
 
-	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 
 	"github.com/networkservicemesh/cloudtest/pkg/commands"
 )
 
 func TestOnlyRun(t *testing.T) {
-	g := NewWithT(t)
-
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
 	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	testConfig := config.NewCloudTestConfig()
 	testConfig.ConfigRoot = tmpDir
@@ -54,11 +52,11 @@ func TestOnlyRun(t *testing.T) {
 	if err != nil {
 		logrus.Errorf("Testing failed: %v", err)
 	}
-	g.Expect(err).To(BeNil())
-	g.Expect(report).NotTo(BeNil())
+	require.Nil(t, err)
+	require.NotNil(t, report)
 
 	rootSuite := report.Suites[0]
-	g.Expect(len(rootSuite.Suites)).To(Equal(1))
-	g.Expect(rootSuite.Suites[0].Failures).To(Equal(0))
-	g.Expect(rootSuite.Suites[0].Tests).To(Equal(1))
+	require.Len(t, rootSuite.Suites, 1)
+	require.Equal(t, 0, rootSuite.Suites[0].Failures)
+	require.Equal(t, 1, rootSuite.Suites[0].Tests)
 }

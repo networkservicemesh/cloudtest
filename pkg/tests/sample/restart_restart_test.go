@@ -23,16 +23,14 @@ import (
 	"os"
 	"testing"
 
-	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 )
 
 func TestRequestRestartPass(t *testing.T) {
-	NewWithT(t)
+
 	logrus.Infof("Passed")
 }
 func TestRequestRestart(t *testing.T) {
-	NewWithT(t)
 	logrus.Infof("Running Restart request test")
 	defer func() {
 		t.Logf("Exiting test with code 11")

@@ -17,12 +17,12 @@
 package tests
 
 import (
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 
-	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 
 	"github.com/networkservicemesh/cloudtest/pkg/commands"
@@ -35,15 +35,13 @@ const (
 )
 
 func TestShellProvider(t *testing.T) {
-	g := NewWithT(t)
-
 	testConfig := config.NewCloudTestConfig()
 
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
 	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
@@ -67,25 +65,23 @@ func TestShellProvider(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err.Error()).To(Equal("there is failed tests 4"))
+	require.Equal(t, "there is failed tests 4", err.Error())
 
-	g.Expect(report).NotTo(BeNil())
+	require.NotNil(t, report)
 
 	rootSuite := report.Suites[0]
 
-	g.Expect(len(rootSuite.Suites)).To(Equal(2))
+	require.Len(t, rootSuite.Suites, 2)
 
-	g.Expect(rootSuite.Suites[0].Failures).To(Equal(2))
-	g.Expect(rootSuite.Suites[0].Tests).To(Equal(6))
-	g.Expect(len(rootSuite.Suites[0].Suites[0].TestCases)).To(Equal(3))
-	g.Expect(len(rootSuite.Suites[0].Suites[1].TestCases)).To(Equal(3))
+	require.Equal(t, 2, rootSuite.Suites[0].Failures)
+	require.Equal(t, 6, rootSuite.Suites[0].Tests)
+	require.Len(t, rootSuite.Suites[0].Suites[0].TestCases, 3)
+	require.Len(t, rootSuite.Suites[0].Suites[1].TestCases, 3)
 
-	g.Expect(rootSuite.Suites[0].Failures).To(Equal(2))
-	g.Expect(rootSuite.Suites[0].Tests).To(Equal(6))
-	g.Expect(len(rootSuite.Suites[1].Suites[0].TestCases)).To(Equal(3))
-	g.Expect(len(rootSuite.Suites[1].Suites[1].TestCases)).To(Equal(3))
-
-	// Do assertions
+	require.Equal(t, 2, rootSuite.Suites[0].Failures)
+	require.Equal(t, 6, rootSuite.Suites[0].Tests)
+	require.Equal(t, 3, len(rootSuite.Suites[1].Suites[0].TestCases))
+	require.Equal(t, 3, len(rootSuite.Suites[1].Suites[1].TestCases))
 }
 
 func createProvider(testConfig *config.CloudTestConfig, name string) *config.ClusterProviderConfig {
@@ -110,15 +106,13 @@ func createProvider(testConfig *config.CloudTestConfig, name string) *config.Clu
 }
 
 func TestInvalidProvider(t *testing.T) {
-	g := NewWithT(t)
-
 	testConfig := config.NewCloudTestConfig()
 
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
 	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
@@ -132,22 +126,19 @@ func TestInvalidProvider(t *testing.T) {
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
 	logrus.Error(err.Error())
-	g.Expect(err.Error()).To(Equal("Failed to create cluster instance. Error invalid start script"))
+	require.Equal(t, "Failed to create cluster instance. Error invalid start script", err.Error())
 
-	g.Expect(report).To(BeNil())
-	// Do assertions
+	require.Nil(t, report)
 }
 
 func TestRequireEnvVars(t *testing.T) {
-	g := NewWithT(t)
-
 	testConfig := config.NewCloudTestConfig()
 
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
 	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	testConfig.ConfigRoot = tmpDir
 
@@ -165,23 +156,19 @@ func TestRequireEnvVars(t *testing.T) {
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
 	logrus.Error(err.Error())
-	g.Expect(err.Error()).To(Equal(
-		"Failed to create cluster instance. Error environment variable are not specified  Required variables: [KUBECONFIG QWE]"))
+	require.Equal(t, err.Error(), "Failed to create cluster instance. Error environment variable are not specified  Required variables: [KUBECONFIG QWE]")
 
-	g.Expect(report).To(BeNil())
-	// Do assertions
+	require.Nil(t, report)
 }
 
 func TestRequireEnvVars_DEPS(t *testing.T) {
-	g := NewWithT(t)
-
 	testConfig := config.NewCloudTestConfig()
 
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
 	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	testConfig.ConfigRoot = tmpDir
 
@@ -214,22 +201,20 @@ func TestRequireEnvVars_DEPS(t *testing.T) {
 	})
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err.Error()).To(Equal("there is failed tests 2"))
+	require.Contains(t, err.Error(), "there is failed tests 2")
 
-	g.Expect(report).ToNot(BeNil())
+	require.NotNil(t, report)
 	// Do assertions
 }
 
 func TestShellProviderShellTest(t *testing.T) {
-	g := NewWithT(t)
-
 	testConfig := config.NewCloudTestConfig()
 
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
 	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
@@ -266,39 +251,36 @@ func TestShellProviderShellTest(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err.Error()).To(Equal("there is failed tests 4"))
+	require.Equal(t, "there is failed tests 4", err.Error())
 
-	g.Expect(report).NotTo(BeNil())
+	require.NotNil(t, report)
 
 	rootSuite := report.Suites[0]
 
-	g.Expect(len(rootSuite.Suites)).To(Equal(3))
+	require.Len(t, rootSuite.Suites, 3)
 
 	for _, executionSuite := range rootSuite.Suites {
 		switch executionSuite.Name {
 		case "simple":
-			g.Expect(executionSuite.Failures).To(Equal(2))
-			g.Expect(executionSuite.Tests).To(Equal(6))
-			g.Expect(len(executionSuite.Suites[0].TestCases)).To(Equal(3))
-			g.Expect(len(executionSuite.Suites[1].TestCases)).To(Equal(3))
+			require.Equal(t, 2, executionSuite.Failures)
+			require.Equal(t, 6, executionSuite.Tests)
+			require.Len(t, executionSuite.Suites[0].TestCases, 3)
+			require.Len(t, executionSuite.Suites[0].TestCases, 3)
 		case "simple_shell":
-			g.Expect(executionSuite.Failures).To(Equal(0))
-			g.Expect(executionSuite.Tests).To(Equal(2))
-			g.Expect(len(executionSuite.Suites[0].TestCases)).To(Equal(1))
-			g.Expect(len(executionSuite.Suites[1].TestCases)).To(Equal(1))
+			require.Equal(t, 0, executionSuite.Failures)
+			require.Equal(t, 2, executionSuite.Tests)
+			require.Len(t, executionSuite.Suites[0].TestCases, 1)
+			require.Len(t, executionSuite.Suites[0].TestCases, 1)
 		case "simple_shell_fail":
-			g.Expect(executionSuite.Failures).To(Equal(2))
-			g.Expect(executionSuite.Tests).To(Equal(2))
-			g.Expect(len(executionSuite.Suites[0].TestCases)).To(Equal(1))
-			g.Expect(len(executionSuite.Suites[1].TestCases)).To(Equal(1))
+			require.Equal(t, 2, executionSuite.Failures)
+			require.Equal(t, 2, executionSuite.Tests)
+			require.Len(t, executionSuite.Suites[0].TestCases, 1)
+			require.Len(t, executionSuite.Suites[0].TestCases, 1)
 		}
 	}
-
-	// Do assertions
 }
 
 func TestUnusedClusterShutdownByMonitor(t *testing.T) {
-	g := NewWithT(t)
 	logKeeper := utils.NewLogKeeper()
 	defer logKeeper.Stop()
 	testConfig := config.NewCloudTestConfig()
@@ -307,7 +289,7 @@ func TestUnusedClusterShutdownByMonitor(t *testing.T) {
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
 	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
@@ -334,21 +316,21 @@ func TestUnusedClusterShutdownByMonitor(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err.Error()).To(Equal("there is failed tests 2"))
+	require.Contains(t, err.Error(), "there is failed tests 2")
 
-	g.Expect(report).NotTo(BeNil())
+	require.NotNil(t, report)
 
 	rootSuite := report.Suites[0]
 
-	g.Expect(len(rootSuite.Suites)).To(Equal(2))
+	require.Len(t, rootSuite.Suites, 2)
 
-	g.Expect(rootSuite.Suites[0].Failures).To(Equal(1))
-	g.Expect(rootSuite.Suites[0].Tests).To(Equal(3))
-	g.Expect(len(rootSuite.Suites[0].Suites[0].TestCases)).To(Equal(3))
+	require.Equal(t, 1, rootSuite.Suites[0].Failures)
+	require.Equal(t, 3, rootSuite.Suites[0].Tests)
+	require.Len(t, rootSuite.Suites[0].Suites[0].TestCases, 3)
 
-	g.Expect(rootSuite.Suites[1].Failures).To(Equal(1))
-	g.Expect(rootSuite.Suites[1].Tests).To(Equal(3))
-	g.Expect(len(rootSuite.Suites[1].Suites[0].TestCases)).To(Equal(3))
+	require.Equal(t, 1, rootSuite.Suites[1].Failures)
+	require.Equal(t, 3, rootSuite.Suites[1].Tests)
+	require.Equal(t, 3, len(rootSuite.Suites[1].Suites[0].TestCases))
 
 	logKeeper.CheckMessagesOrder(t, []string{
 		"All tasks for cluster group a_provider are complete. Starting cluster shutdown",
@@ -358,15 +340,13 @@ func TestUnusedClusterShutdownByMonitor(t *testing.T) {
 }
 
 func TestMultiClusterTest(t *testing.T) {
-	g := NewWithT(t)
-
 	testConfig := config.NewCloudTestConfig()
 
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
 	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	testConfig.ConfigRoot = tmpDir
 	p1 := createProvider(testConfig, "a_provider")
@@ -412,35 +392,31 @@ func TestMultiClusterTest(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err.Error()).To(Equal("there is failed tests 3"))
+	require.Contains(t, err.Error(), "there is failed tests 3")
 
-	g.Expect(report).NotTo(BeNil())
+	require.NotNil(t, report)
 
 	rootSuite := report.Suites[0]
 
-	g.Expect(len(rootSuite.Suites)).To(Equal(3))
+	require.Len(t, rootSuite.Suites, 3)
 
-	g.Expect(rootSuite.Suites[0].Failures).To(Equal(1))
-	g.Expect(rootSuite.Suites[0].Tests).To(Equal(3))
+	require.Equal(t, 1, rootSuite.Suites[0].Failures)
+	require.Equal(t, 3, rootSuite.Suites[0].Tests)
 
-	g.Expect(rootSuite.Suites[1].Failures).To(Equal(1))
-	g.Expect(rootSuite.Suites[1].Tests).To(Equal(3))
+	require.Equal(t, 1, rootSuite.Suites[1].Failures)
+	require.Equal(t, 3, rootSuite.Suites[1].Tests)
 
-	g.Expect(rootSuite.Suites[2].Failures).To(Equal(1))
-	g.Expect(rootSuite.Suites[2].Tests).To(Equal(3))
-
-	// Do assertions
+	require.Equal(t, 1, rootSuite.Suites[2].Failures)
+	require.Equal(t, 3, rootSuite.Suites[2].Tests)
 }
 
 func TestGlobalTimeout(t *testing.T) {
-	g := NewWithT(t)
-
 	testConfig := config.NewCloudTestConfig()
 	testConfig.Timeout = 3
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
 	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
@@ -454,16 +430,14 @@ func TestGlobalTimeout(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err.Error()).To(Equal("global timeout elapsed: 3 seconds"))
+	require.Equal(t, "global timeout elapsed: 3 seconds", err.Error())
 
-	g.Expect(report).NotTo(BeNil())
+	require.NotNil(t, report)
 
 	rootSuite := report.Suites[0]
 
-	g.Expect(len(rootSuite.Suites)).To(Equal(1))
-	g.Expect(rootSuite.Suites[0].Failures).To(Equal(1))
-	g.Expect(rootSuite.Suites[0].Tests).To(Equal(3))
-	g.Expect(len(rootSuite.Suites[0].Suites[0].TestCases)).To(Equal(3))
-
-	// Do assertions
+	require.Len(t, rootSuite.Suites, 1)
+	require.Equal(t, 1, rootSuite.Suites[0].Failures)
+	require.Equal(t, 3, rootSuite.Suites[0].Tests)
+	require.Len(t, rootSuite.Suites[0].Suites[0].TestCases, 3)
 }

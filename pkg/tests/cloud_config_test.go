@@ -17,11 +17,11 @@
 package tests
 
 import (
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"testing"
 	"time"
 
-	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v2"
 
 	"github.com/networkservicemesh/cloudtest/pkg/commands"
@@ -29,39 +29,36 @@ import (
 )
 
 func TestClusterConfiguration(t *testing.T) {
-	g := NewWithT(t)
 
 	var testConfig config.CloudTestConfig
 
 	file1, err := ioutil.ReadFile("./config1.yaml")
-	g.Expect(err).To(BeNil())
+	require.NoError(t, err)
 
 	err = yaml.Unmarshal(file1, &testConfig)
-	g.Expect(err).To(BeNil())
-	g.Expect(len(testConfig.Providers)).To(Equal(3))
-	g.Expect(testConfig.Reporting.JUnitReportFile).To(Equal("./.tests/junit.xml"))
+	require.NoError(t, err)
+	require.Len(t, testConfig.Providers, 3)
+	require.Equal(t, "./.tests/junit.xml", testConfig.Reporting.JUnitReportFile)
 }
 
 func TestClusterHealthCheckConfig(t *testing.T) {
-	g := NewWithT(t)
-
 	var testConfig config.CloudTestConfig
 
 	file1, err := ioutil.ReadFile("./config1.yaml")
-	g.Expect(err).To(BeNil())
+	require.NoError(t, err)
 
 	err = yaml.Unmarshal(file1, &testConfig)
-	g.Expect(err).To(BeNil())
-	g.Expect(len(testConfig.Providers)).To(Equal(3))
-	g.Expect(testConfig.Reporting.JUnitReportFile).To(Equal("./.tests/junit.xml"))
+	require.NoError(t, err)
+	require.Len(t, testConfig.Providers, 3)
+	require.Equal(t, testConfig.Reporting.JUnitReportFile, "./.tests/junit.xml")
 
 	errChan := make(chan error, len(testConfig.HealthCheck))
 	commands.RunHealthChecks(testConfig.HealthCheck, errChan)
 
 	select {
 	case err = <-errChan:
-		g.Expect(err.Error()).To(ContainSubstring("Health check failed"))
+		require.Contains(t, err.Error(), "Health check failed")
 	case <-time.After(5 * time.Second):
-		g.Expect(false).To(BeTrue())
+		t.Fatal("timeout")
 	}
 }
