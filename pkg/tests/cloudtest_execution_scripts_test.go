@@ -22,23 +22,21 @@ import (
 	"path"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/networkservicemesh/cloudtest/pkg/commands"
 	"github.com/networkservicemesh/cloudtest/pkg/config"
 	"github.com/networkservicemesh/cloudtest/pkg/utils"
-
-	. "github.com/onsi/gomega"
 )
 
 func TestAfterWorksCorrectly(t *testing.T) {
-	g := NewWithT(t)
-
 	testConfig := &config.CloudTestConfig{}
 
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
 	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	testConfig.ConfigRoot = tmpDir
 	provider := &config.ClusterProviderConfig{
@@ -77,25 +75,23 @@ func TestAfterWorksCorrectly(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err).Should(BeNil())
-	g.Expect(report).NotTo(BeNil())
+	require.NoError(t, err)
+	require.NotNil(t, report)
 
 	path := path.Join(tmpDir, provider.Name+"-1", "007-test2-run.log")
 	content, err := ioutil.ReadFile(path)
-	g.Expect(err).Should(BeNil())
-	g.Expect(string(content)).Should(ContainSubstring("After worked"))
+	require.NoError(t, err)
+	require.Contains(t, string(content), "After worked")
 }
 
 func TestBeforeWorksCorrectly(t *testing.T) {
-	g := NewWithT(t)
-
 	testConfig := &config.CloudTestConfig{}
 
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
 	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	testConfig.ConfigRoot = tmpDir
 	provider := &config.ClusterProviderConfig{
@@ -134,11 +130,11 @@ func TestBeforeWorksCorrectly(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err).Should(BeNil())
-	g.Expect(report).NotTo(BeNil())
+	require.NoError(t, err)
+	require.NotNil(t, report)
 
 	path := path.Join(tmpDir, provider.Name+"-1", "006-test1-run.log")
 	content, err := ioutil.ReadFile(path)
-	g.Expect(err).Should(BeNil())
-	g.Expect(string(content)).Should(ContainSubstring("Before worked"))
+	require.NoError(t, err)
+	require.Contains(t, string(content), "Before worked")
 }

@@ -4,12 +4,13 @@ go 1.15
 
 require (
 	github.com/google/uuid v1.1.1
-	github.com/onsi/gomega v1.9.0
 	github.com/packethost/packngo v0.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v1.0.0
+	github.com/stretchr/testify v1.6.1
 	gopkg.in/yaml.v2 v2.2.8
+	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776 // indirect
 	k8s.io/api v0.18.1
 	k8s.io/apimachinery v0.18.1
 	k8s.io/client-go v11.0.0+incompatible

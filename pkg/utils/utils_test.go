@@ -20,13 +20,11 @@ package utils
 import (
 	"testing"
 
-	"github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMatchPattern(t *testing.T) {
-	g := gomega.NewWithT(t)
-
-	g.Expect(MatchRetestPattern([]string{
+	require.True(t, MatchRetestPattern([]string{
 		"unable to establish connection to VPP (VPP API socket file /run/vpp/api.sock does not exist)",
-	}, "time=\"2019-11-22 09:28:45.55766\" level=fatal msg=\"unable to establish connection to VPP (VPP API socket file /run/vpp/api.sock does not exist)\" loc=\"vpp-agent/main.go(65)\" logger=defaultLogger")).To(gomega.Equal(true))
+	}, "time=\"2019-11-22 09:28:45.55766\" level=fatal msg=\"unable to establish connection to VPP (VPP API socket file /run/vpp/api.sock does not exist)\" loc=\"vpp-agent/main.go(65)\" logger=defaultLogger"))
 }

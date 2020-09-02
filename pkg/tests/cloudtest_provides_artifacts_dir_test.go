@@ -22,25 +22,23 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 
 	"github.com/networkservicemesh/cloudtest/pkg/commands"
 	"github.com/networkservicemesh/cloudtest/pkg/config"
 )
 
 func TestCloudtestProvidesArtifactsDirForEachTest(t *testing.T) {
-	g := gomega.NewWithT(t)
-
 	testConfig := &config.CloudTestConfig{}
 
 	testConfig.Timeout = 300
 	err := os.Mkdir(t.Name(), os.ModePerm)
-	g.Expect(err).Should(gomega.BeNil())
+	require.Nil(t, err)
 	defer func() {
 		_ = os.RemoveAll(t.Name())
 	}()
 	relativePath, err := ioutil.TempDir(t.Name(), "tmp")
-	g.Expect(err).Should(gomega.BeNil())
+	require.Nil(t, err)
 
 	testConfig.ConfigRoot = relativePath
 	createProvider(testConfig, "provider")
@@ -57,8 +55,8 @@ func TestCloudtestProvidesArtifactsDirForEachTest(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	_, err = commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err).Should(gomega.BeNil())
+	require.Nil(t, err)
 	content, err := ioutil.ReadFile(filepath.Join(relativePath, testConfig.Providers[0].Name+"-1", "TestArtifacts", "artifact1.txt"))
-	g.Expect(err).Should(gomega.BeNil())
-	g.Expect(string(content)).Should(gomega.Equal("test result"))
+	require.Nil(t, err)
+	require.Equal(t, "test result", string(content))
 }

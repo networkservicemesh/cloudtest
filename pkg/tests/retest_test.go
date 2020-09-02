@@ -22,7 +22,8 @@ import (
 	"os"
 	"testing"
 
-	. "github.com/onsi/gomega"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 
 	"github.com/networkservicemesh/cloudtest/pkg/commands"
 	"github.com/networkservicemesh/cloudtest/pkg/config"
@@ -30,8 +31,6 @@ import (
 )
 
 func TestRestartRequest(t *testing.T) {
-	g := NewWithT(t)
-
 	logKeeper := utils.NewLogKeeper()
 	defer logKeeper.Stop()
 
@@ -45,7 +44,7 @@ func TestRestartRequest(t *testing.T) {
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
 	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
@@ -62,28 +61,27 @@ func TestRestartRequest(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err.Error()).To(Equal("there is failed tests 1"))
+	logrus.Info(err.Error())
+	require.Contains(t, err.Error(), "there is failed tests 1")
 
-	g.Expect(report).NotTo(BeNil())
+	require.NotNil(t, report)
 
 	rootSuite := report.Suites[0]
 
-	g.Expect(len(rootSuite.Suites)).To(Equal(1))
-	g.Expect(rootSuite.Suites[0].Failures).To(Equal(1))
-	g.Expect(rootSuite.Suites[0].Tests).To(Equal(2))
-	g.Expect(len(rootSuite.Suites[0].Suites[0].TestCases)).To(Equal(2))
+	require.Len(t, rootSuite.Suites, 1)
+	require.Equal(t, 1, rootSuite.Suites[0].Failures)
+	require.Len(t, rootSuite.Suites, 1)
+	require.Len(t, rootSuite.Suites[0].Suites[0].TestCases, 2)
 
 	logKeeper.CheckMessagesOrder(t, []string{
 		"Starting TestRequestRestart",
 		"Re schedule task TestRequestRestart reason: rerun-request",
 		"Test TestRequestRestart retry count 2 exceed: err",
 	})
-	g.Expect(logKeeper.MessageCount("Re schedule task TestRequestRestart reason: rerun-request")).To(Equal(2))
+	require.Equal(t, 2, logKeeper.MessageCount("Re schedule task TestRequestRestart reason: rerun-request"))
 }
 
 func TestRestartRetestDestroyCluster(t *testing.T) {
-	g := NewWithT(t)
-
 	logKeeper := utils.NewLogKeeper()
 	defer logKeeper.Stop()
 
@@ -99,7 +97,7 @@ func TestRestartRetestDestroyCluster(t *testing.T) {
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
 	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	testConfig.ConfigRoot = tmpDir
 	p := createProvider(testConfig, "a_provider")
@@ -118,20 +116,20 @@ func TestRestartRetestDestroyCluster(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err.Error()).To(Equal("there is failed tests 1"))
+	require.Contains(t, err.Error(), "there is failed tests 1")
 
-	g.Expect(report).NotTo(BeNil())
+	require.NotNil(t, report)
 
 	rootSuite := report.Suites[0]
-	g.Expect(len(rootSuite.Suites)).To(Equal(2))
+	require.Len(t, rootSuite.Suites, 2)
 
-	g.Expect(rootSuite.Suites[0].Tests).To(Equal(2))
-	g.Expect(rootSuite.Suites[0].Failures).To(Equal(0))
-	g.Expect(len(rootSuite.Suites[0].Suites[0].TestCases)).To(Equal(2))
+	require.Equal(t, 2, rootSuite.Suites[0].Tests)
+	require.Equal(t, 0, rootSuite.Suites[0].Failures)
+	require.Len(t, rootSuite.Suites[0].Suites[0].TestCases, 2)
 
-	g.Expect(rootSuite.Suites[1].Tests).To(Equal(1))
-	g.Expect(rootSuite.Suites[1].Failures).To(Equal(1))
-	g.Expect(len(rootSuite.Suites[1].TestCases)).To(Equal(1))
+	require.Equal(t, 1, rootSuite.Suites[1].Failures)
+	require.Equal(t, 1, rootSuite.Suites[1].Tests)
+	require.Len(t, rootSuite.Suites[1].TestCases, 1)
 
 	logKeeper.CheckMessagesOrder(t, []string{
 		"Starting TestRequestRestart",
@@ -146,8 +144,6 @@ func TestRestartRetestDestroyCluster(t *testing.T) {
 }
 
 func TestRestartRequestRestartCluster(t *testing.T) {
-	g := NewWithT(t)
-
 	logKeeper := utils.NewLogKeeper()
 	defer logKeeper.Stop()
 
@@ -163,7 +159,7 @@ func TestRestartRequestRestartCluster(t *testing.T) {
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
 	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	testConfig.ConfigRoot = tmpDir
 	p := createProvider(testConfig, "a_provider")
@@ -182,15 +178,15 @@ func TestRestartRequestRestartCluster(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err.Error()).To(Equal("there is failed tests 1"))
+	require.Contains(t, err.Error(), "there is failed tests 1")
 
-	g.Expect(report).NotTo(BeNil())
+	require.NotNil(t, report)
 
 	rootSuite := report.Suites[0]
-	g.Expect(len(rootSuite.Suites)).To(Equal(1))
-	g.Expect(rootSuite.Suites[0].Failures).To(Equal(1))
-	g.Expect(rootSuite.Suites[0].Tests).To(Equal(2))
-	g.Expect(len(rootSuite.Suites[0].Suites[0].TestCases)).To(Equal(2))
+	require.Len(t, rootSuite.Suites, 1)
+	require.Equal(t, 1, rootSuite.Suites[0].Failures)
+	require.Len(t, rootSuite.Suites, 1)
+	require.Len(t, rootSuite.Suites[0].Suites[0].TestCases, 2)
 
 	logKeeper.CheckMessagesOrder(t, []string{
 		"Starting TestRequestRestart",
@@ -199,12 +195,10 @@ func TestRestartRequestRestartCluster(t *testing.T) {
 		"Starting cluster ",
 		"Test TestRequestRestart retry count 3 exceed: err: failed to run go test",
 	})
-	g.Expect(logKeeper.MessageCount("Re schedule task TestRequestRestart reason: rerun-request")).To(Equal(3))
+	require.Equal(t, 3, logKeeper.MessageCount("Re schedule task TestRequestRestart reason: rerun-request"))
 }
 
 func TestRestartRequestSkip(t *testing.T) {
-	g := NewWithT(t)
-
 	logKeeper := utils.NewLogKeeper()
 	defer logKeeper.Stop()
 
@@ -219,7 +213,7 @@ func TestRestartRequestSkip(t *testing.T) {
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
 	defer utils.ClearFolder(tmpDir, false)
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
@@ -236,19 +230,19 @@ func TestRestartRequestSkip(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	g.Expect(err).To(BeNil())
+	require.Nil(t, err)
 
-	g.Expect(report).NotTo(BeNil())
+	require.NotNil(t, report)
 
 	rootSuite := report.Suites[0]
-	g.Expect(len(rootSuite.Suites)).To(Equal(1))
-	g.Expect(rootSuite.Suites[0].Failures).To(Equal(0))
-	g.Expect(rootSuite.Suites[0].Tests).To(Equal(2))
-	g.Expect(len(rootSuite.Suites[0].Suites[0].TestCases)).To(Equal(2))
+	require.Len(t, rootSuite.Suites, 1)
+	require.Equal(t, 0, rootSuite.Suites[0].Failures)
+	require.Len(t, rootSuite.Suites, 1)
+	require.Len(t, rootSuite.Suites[0].Suites[0].TestCases, 2)
 
 	for _, tt := range rootSuite.Suites[0].TestCases {
 		if tt.Name == "_TestRequestRestart" {
-			g.Expect(tt.SkipMessage.Message).To(Equal("Test TestRequestRestart retry count 2 exceed: err: failed to run go test . -test.timeout 50m0s -count 1 --run \"^(TestRequestRestart)\\\\z\" --tags \"request_restart\" --test.v ExitCode: 1"))
+			require.Equal(t, "Test TestRequestRestart retry count 2 exceed: err: failed to run go test . -test.timeout 50m0s -count 1 --run \"^(TestRequestRestart)\\\\z\" --tags \"request_restart\" --test.v ExitCode: 1", tt.SkipMessage.Message)
 		}
 	}
 
@@ -258,5 +252,5 @@ func TestRestartRequestSkip(t *testing.T) {
 		"Test TestRequestRestart retry count 2 exceed: err",
 		"Re schedule task TestRequestRestart reason: skipped",
 	})
-	g.Expect(logKeeper.MessageCount("Re schedule task TestRequestRestart reason: rerun-request")).To(Equal(2))
+	require.Equal(t, 2, logKeeper.MessageCount("Re schedule task TestRequestRestart reason: rerun-request"))
 }

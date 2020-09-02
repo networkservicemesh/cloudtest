@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/networkservicemesh/cloudtest/pkg/utils"
 
 	"github.com/networkservicemesh/cloudtest/pkg/execmanager"
@@ -30,15 +32,12 @@ import (
 	"github.com/networkservicemesh/cloudtest/pkg/model"
 
 	"github.com/networkservicemesh/cloudtest/pkg/config"
-
-	"github.com/onsi/gomega"
 )
 
 func TestUpdateTaskWithTimeout_ShouldNotCompleteTask(t *testing.T) {
-	assert := gomega.NewWithT(t)
 	tmpDir, err := ioutil.TempDir(os.TempDir(), t.Name())
 	defer utils.ClearFolder(tmpDir, false)
-	assert.Expect(err).To(gomega.BeNil())
+	require.Nil(t, err)
 
 	ctx := executionContext{
 		cloudTestConfig:  config.NewCloudTestConfig(),
@@ -66,5 +65,5 @@ func TestUpdateTaskWithTimeout_ShouldNotCompleteTask(t *testing.T) {
 	ctx.tasks = append(ctx.tasks, task)
 	ctx.updateTestExecution(task, "", model.StatusTimeout)
 	_ = ctx.pollEvents(context.Background(), termChannel, statTicker.C)
-	assert.Expect(len(ctx.completed)).Should(gomega.BeZero())
+	require.Len(t, ctx.completed, 0)
 }
