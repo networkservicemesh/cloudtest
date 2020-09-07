@@ -242,6 +242,7 @@ func TestClusterInstancesOnFailShellRunnerInterdomain(t *testing.T) {
 	defer logKeeper.Stop()
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
+	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "there is failed tests 1")
 	foundFailTest := false
 

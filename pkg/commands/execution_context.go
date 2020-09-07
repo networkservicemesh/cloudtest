@@ -784,7 +784,7 @@ func (ctx *executionContext) createTask(entry *model.TestEntry, taskIndex, taskO
 					if len(tasks) == 0 {
 						for _, test := range ctx.splitTest(entry, cluster) {
 							task := ctx.createSingleTask(taskIndex, test, cluster, taskOrderIndex)
-							updateTaskStatus(task)
+							defer updateTaskStatus(task)
 							tasks = append(tasks, task)
 							taskIndex++
 						}
