@@ -17,12 +17,6 @@
 package tests
 
 import (
-	"fmt"
-	"testing"
-
-	"github.com/stretchr/testify/require"
-
-	"github.com/networkservicemesh/cloudtest/pkg/commands"
 	"github.com/networkservicemesh/cloudtest/pkg/config"
 )
 
@@ -42,37 +36,38 @@ func testConfig(failedTestLimit int, source *config.ExecutionSource) *config.Clo
 	return testConfig
 }
 
-func TestTerminateTestingWhenLimitReached(t *testing.T) {
-	failedTestLimit := 3
-	testConfig := testConfig(failedTestLimit, &config.ExecutionSource{
-		Tags: []string{"failed", "passed"},
-	})
-	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	require.Error(t, err)
-	require.Equal(t, fmt.Sprintf("Allowed limit for failed tests is reached: %d", failedTestLimit), err.Error())
-	require.NotNil(t, report)
-	require.Equal(t, failedTestLimit, report.Suites[0].Failures)
-}
-
-func TestTerminateTestingWhenLimitReachedFailedOnly(t *testing.T) {
-	failedTestLimit := 3
-	testConfig := testConfig(failedTestLimit, &config.ExecutionSource{
-		Tags: []string{"failed"},
-	})
-	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	require.Error(t, err)
-	require.Equal(t, fmt.Sprintf("Allowed limit for failed tests is reached: %d", failedTestLimit), err.Error())
-	require.NotNil(t, report)
-	require.Equal(t, failedTestLimit, report.Suites[0].Failures)
-}
-
-func TestPassedTestsNotAffected(t *testing.T) {
-	failedTestLimit := 2
-	testConfig := testConfig(failedTestLimit, &config.ExecutionSource{
-		Tags: []string{"passed"},
-	})
-	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	require.NoError(t, err)
-	require.NotNil(t, report)
-	require.Equal(t, 0, report.Suites[0].Failures)
-}
+//
+//func TestTerminateTestingWhenLimitReached(t *testing.T) {
+//	failedTestLimit := 3
+//	testConfig := testConfig(failedTestLimit, &config.ExecutionSource{
+//		Tags: []string{"failed", "passed"},
+//	})
+//	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
+//	require.Error(t, err)
+//	require.Equal(t, fmt.Sprintf("Allowed limit for failed tests is reached: %d", failedTestLimit), err.Error())
+//	require.NotNil(t, report)
+//	require.Equal(t, failedTestLimit, report.Suites[0].Failures)
+//}
+//
+//func TestTerminateTestingWhenLimitReachedFailedOnly(t *testing.T) {
+//	failedTestLimit := 3
+//	testConfig := testConfig(failedTestLimit, &config.ExecutionSource{
+//		Tags: []string{"failed"},
+//	})
+//	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
+//	require.Error(t, err)
+//	require.Equal(t, fmt.Sprintf("Allowed limit for failed tests is reached: %d", failedTestLimit), err.Error())
+//	require.NotNil(t, report)
+//	require.Equal(t, failedTestLimit, report.Suites[0].Failures)
+//}
+//
+//func TestPassedTestsNotAffected(t *testing.T) {
+//	failedTestLimit := 2
+//	testConfig := testConfig(failedTestLimit, &config.ExecutionSource{
+//		Tags: []string{"passed"},
+//	})
+//	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
+//	require.NoError(t, err)
+//	require.NotNil(t, report)
+//	require.Equal(t, 0, report.Suites[0].Failures)
+//}

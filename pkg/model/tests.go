@@ -63,10 +63,12 @@ type TestEntryExecution struct {
 type TestEntryKind uint8
 
 const (
-	// TestEntryKindGoTest - go test test
-	TestEntryKindGoTest TestEntryKind = iota
-	// TestEntryKindShellTest - shell test.
-	TestEntryKindShellTest
+	// GoTest - go test test
+	GoTest TestEntryKind = iota
+	// ShellTest - shell test.
+	ShellTest
+	// SuiteTest - go test suites
+	SuiteTest
 )
 
 // TestEntry - represent one found test
@@ -75,6 +77,7 @@ type TestEntry struct {
 	Tags            string // A list of tags
 	Key             string // Unique key
 	ExecutionConfig *config.Execution
+	Suite           *Suite
 
 	Executions []TestEntryExecution
 	Duration   time.Duration

@@ -3,6 +3,7 @@ module github.com/networkservicemesh/cloudtest
 go 1.15
 
 require (
+	github.com/edwarnicke/exechelper v1.0.1
 	github.com/google/uuid v1.1.1
 	github.com/packethost/packngo v0.2.0
 	github.com/pkg/errors v0.9.1
