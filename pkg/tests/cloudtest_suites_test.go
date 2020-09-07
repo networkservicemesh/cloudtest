@@ -17,7 +17,6 @@
 package tests
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -38,9 +37,8 @@ func TestCloudtestCanWorkWithSuites(t *testing.T) {
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
 	testConfig.MinSuiteSize = 3
@@ -55,6 +53,7 @@ func TestCloudtestCanWorkWithSuites(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
+	require.NoError(t, err)
 	require.NotNil(t, report)
 
 	const testName = "TestRunSuite"
@@ -76,8 +75,8 @@ func TestCloudtestCanWorkWithSuitesSplit(t *testing.T) {
 	testConfig.MinSuiteSize = 2
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
 
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
@@ -92,8 +91,8 @@ func TestCloudtestCanWorkWithSuitesSplit(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	require.NotNil(t, report)
 	require.NoError(t, err)
+	require.NotNil(t, report)
 
 	const testName = "TestRunSuite"
 
@@ -105,10 +104,9 @@ func TestCloudtestCanWorkWithSuitesSplit(t *testing.T) {
 
 func getSuiteRunTestsCount(t *testing.T, dir, testName string) int {
 	files, err := ioutil.ReadDir(dir)
-	fileName := fmt.Sprintf("%v-run.log", testName)
 	for _, file := range files {
 		require.NoError(t, err)
-		if strings.HasSuffix(file.Name(), fileName) {
+		if strings.Contains(file.Name(), testName) {
 			bytes, err := ioutil.ReadFile(path.Join(dir, file.Name()))
 			require.NoError(t, err)
 			log := string(bytes)

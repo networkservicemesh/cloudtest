@@ -1,4 +1,4 @@
-// Copyright (c) 2020 Doc.ai and/or its affiliates.
+// Copyright (c) 2019-2020 Cisco Systems, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -28,15 +28,15 @@ import (
 )
 
 func TestFind(t *testing.T) {
-	suites, err := suites.Find("./samples")
+	foundSuites, err := suites.Find("./samples")
 	require.NoError(t, err)
-	require.NotNil(t, suites)
-	require.Len(t, suites, 6)
-	sort.Slice(suites, func(i, j int) bool {
-		return strings.Compare(suites[i].Name, suites[j].Name) == -1
+	require.NotNil(t, foundSuites)
+	require.Len(t, foundSuites, 6)
+	sort.Slice(foundSuites, func(i, j int) bool {
+		return strings.Compare(foundSuites[i].Name, foundSuites[j].Name) == -1
 	})
-	for i, s := range suites {
+	for i, s := range foundSuites {
 		require.Equal(t, s.Name, fmt.Sprintf("TestEntryPoint%v", i+1))
 	}
-	require.Len(t, suites[5].Tests, 4)
+	require.Len(t, foundSuites[5].Tests, 4)
 }

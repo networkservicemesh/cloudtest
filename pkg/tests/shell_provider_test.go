@@ -41,9 +41,8 @@ func TestShellProvider(t *testing.T) {
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
 	createProvider(testConfig, "b_provider")
@@ -112,9 +111,8 @@ func TestInvalidProvider(t *testing.T) {
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
 	delete(testConfig.Providers[0].Scripts, "start")
@@ -138,9 +136,8 @@ func TestRequireEnvVars(t *testing.T) {
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 
 	createProvider(testConfig, "a_provider")
@@ -168,9 +165,8 @@ func TestRequireEnvVars_DEPS(t *testing.T) {
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 
 	createProvider(testConfig, "a_provider")
@@ -214,9 +210,8 @@ func TestShellProviderShellTest(t *testing.T) {
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
 	createProvider(testConfig, "b_provider")
@@ -289,9 +284,8 @@ func TestUnusedClusterShutdownByMonitor(t *testing.T) {
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
 	p2 := createProvider(testConfig, "b_provider")
@@ -346,9 +340,8 @@ func TestMultiClusterTest(t *testing.T) {
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	p1 := createProvider(testConfig, "a_provider")
 	p2 := createProvider(testConfig, "b_provider")
@@ -416,9 +409,8 @@ func TestGlobalTimeout(t *testing.T) {
 	testConfig.Timeout = 3
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
 

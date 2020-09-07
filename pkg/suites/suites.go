@@ -34,7 +34,6 @@ func Find(root string) ([]*model.Suite, error) {
 	var testPaths []string
 	var suiteTests = make(map[string][]string)
 	var suiteEntryPoints = make(map[string][]string)
-	var result []*model.Suite
 
 	if err := filepath.Walk(root,
 		func(path string, info os.FileInfo, err error) error {
@@ -78,6 +77,12 @@ func Find(root string) ([]*model.Suite, error) {
 			}
 		})
 	}
+
+	return buildSuites(suiteTests, suiteEntryPoints), nil
+}
+
+func buildSuites(suiteTests, suiteEntryPoints map[string][]string) []*model.Suite {
+	var result []*model.Suite
 	for k, v := range suiteTests {
 		rootTests := suiteEntryPoints[k]
 		if len(rootTests) == 0 {
@@ -90,7 +95,7 @@ func Find(root string) ([]*model.Suite, error) {
 			})
 		}
 	}
-	return result, nil
+	return result
 }
 
 func forEachTest(node ast.Node, applier func(decl *ast.FuncDecl)) {

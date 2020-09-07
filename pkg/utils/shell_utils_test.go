@@ -32,7 +32,7 @@ func TestProcessOutputShouldNotLostOutput(t *testing.T) {
 	start := time.Now()
 	for time.Since(start) < time.Second {
 		output, err := RunCommand(context.Background(), fmt.Sprintf("echo \"%v\"", expected), "", func(s string) {}, bufio.NewWriter(&strings.Builder{}), nil, nil, true)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.Equal(t, expected, strings.TrimSpace(output))
 	}
 }

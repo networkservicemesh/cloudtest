@@ -737,38 +737,62 @@ func (ctx *executionContext) splitTest(test *model.TestEntry, cluster *clustersG
 		countPerInstance = ctx.cloudTestConfig.MinSuiteSize
 	}
 	for i := 0; i < len(cluster.instances); i++ {
-		splitTest := *test
+		splitTest := &model.TestEntry{
+			Kind:            test.Kind,
+			Name:            test.Name,
+			Tags:            test.Tags,
+			Status:          test.Status,
+			ExecutionConfig: test.ExecutionConfig,
+			Executions:      []model.TestEntryExecution{},
+			RunScript:       test.RunScript,
+		}
+		splitTest.Name += fmt.Sprint(i + 1)
 		splitTest.Suite = &model.Suite{
 			Name: test.Suite.Name,
 		}
 		if len(test.Suite.Tests)-(i+1)*countPerInstance < countPerInstance || i+1 == len(cluster.instances) {
 			splitTest.Suite.Tests = test.Suite.Tests[i*countPerInstance:]
-			result = append(result, &splitTest)
+			result = append(result, splitTest)
 			return result
 		}
-		result = append(result, &splitTest)
+		result = append(result, splitTest)
 		splitTest.Suite.Tests = test.Suite.Tests[i*countPerInstance : (i+1)*countPerInstance]
 	}
 	return result
 }
 
-func (ctx *executionContext) createTask(test *model.TestEntry, taskIndex, taskOrderIndex int) int {
-	selector := test.ExecutionConfig.ClusterSelector
+func (ctx *executionContext) createTask(entry *model.TestEntry, taskIndex, taskOrderIndex int) int {
+	selector := entry.ExecutionConfig.ClusterSelector
 	// In case of one cluster, we create task copies and execute on every cloud.
-
-	var task *testTask
-	if test.ExecutionConfig.ClusterCount > 1 {
+	updateTaskStatus := func(task *testTask) {
+		if task == nil {
+			logrus.Errorf("%v: No clusters defined of required %+v", entry.Name, selector)
+			return
+		}
+		if len(task.clusters) < entry.ExecutionConfig.ClusterCount {
+			logrus.Errorf("%s: not all clusters defined of required %v", entry.Name, selector)
+			task.test.Status = model.StatusSkipped
+		} else {
+			task.clusterTaskID = makeTaskClusterID(task.clusters)
+		}
+	}
+	if entry.ExecutionConfig.ClusterCount > 1 {
+		var tasks []*testTask
 		for _, clusterName := range selector {
 			for _, cluster := range ctx.clusters {
 				if clusterName == cluster.config.Name {
-					if task == nil {
-						for _, suite := range ctx.splitTest(test, cluster) {
-							task = ctx.createSingleTask(taskIndex, suite, cluster, taskOrderIndex)
+					if len(tasks) == 0 {
+						for _, test := range ctx.splitTest(entry, cluster) {
+							task := ctx.createSingleTask(taskIndex, test, cluster, taskOrderIndex)
+							updateTaskStatus(task)
+							tasks = append(tasks, task)
 							taskIndex++
 						}
 					} else {
-						task.clusters = append(task.clusters, cluster)
-						cluster.tasks[task.test.Key] = task
+						for _, task := range tasks {
+							task.clusters = append(task.clusters, cluster)
+							cluster.tasks[task.test.Key] = task
+						}
 					}
 					break
 				}
@@ -778,21 +802,13 @@ func (ctx *executionContext) createTask(test *model.TestEntry, taskIndex, taskOr
 		for _, cluster := range ctx.clusters {
 			if len(selector) > 0 && utils.Contains(selector, cluster.config.Name) ||
 				len(selector) == 0 {
-				for _, suite := range ctx.splitTest(test, cluster) {
-					task = ctx.createSingleTask(taskIndex, suite, cluster, taskOrderIndex)
+				for _, test := range ctx.splitTest(entry, cluster) {
+					task := ctx.createSingleTask(taskIndex, test, cluster, taskOrderIndex)
+					updateTaskStatus(task)
 					taskIndex++
 				}
 			}
 		}
-	}
-
-	if task == nil {
-		logrus.Errorf("%s: no clusters defined of required %v", test.Name, selector)
-	} else if len(task.clusters) < test.ExecutionConfig.ClusterCount {
-		logrus.Errorf("%s: not all clusters defined of required %v", test.Name, selector)
-		task.test.Status = model.StatusSkipped
-	} else {
-		task.clusterTaskID = makeTaskClusterID(task.clusters)
 	}
 
 	return taskIndex
@@ -1040,7 +1056,6 @@ func (ctx *executionContext) executeTask(task *testTask, clusterConfigs []string
 	}
 
 	task.test.Duration = time.Since(st)
-
 	if errCode != nil {
 		// Check if cluster is alive.
 		clusterNotAvailable := false

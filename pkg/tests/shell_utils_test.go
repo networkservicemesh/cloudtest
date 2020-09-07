@@ -39,7 +39,7 @@ func TestVariableSubstitutions(t *testing.T) {
 	}
 
 	var1, err := utils.SubstituteVariable("qwe ${KUBECONFIG} $(uuid) BBB", env, args)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, "qwe ~/.kube/config uu-uu BBB", var1)
 }
 
