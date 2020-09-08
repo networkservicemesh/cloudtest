@@ -1,6 +1,4 @@
-// +build suite
-
-package sample
+package suites
 
 import (
 	"testing"

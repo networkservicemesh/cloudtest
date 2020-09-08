@@ -46,8 +46,7 @@ func TestCloudtestCanWorkWithSuites(t *testing.T) {
 	testConfig.Executions = append(testConfig.Executions, &config.Execution{
 		Name:        "simple",
 		Timeout:     15,
-		PackageRoot: "./sample",
-		Source:      config.ExecutionSource{Tags: []string{"suite"}},
+		PackageRoot: "./sample/suites",
 	})
 
 	testConfig.Reporting.JUnitReportFile = JunitReport
@@ -84,8 +83,7 @@ func TestCloudtestCanWorkWithSuitesSplit(t *testing.T) {
 	testConfig.Executions = append(testConfig.Executions, &config.Execution{
 		Name:        "simple",
 		Timeout:     15,
-		PackageRoot: "./sample",
-		Source:      config.ExecutionSource{Tags: []string{"suite"}},
+		PackageRoot: "./sample/suites",
 	})
 
 	testConfig.Reporting.JUnitReportFile = JunitReport
