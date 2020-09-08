@@ -63,12 +63,12 @@ type TestEntryExecution struct {
 type TestEntryKind uint8
 
 const (
-	// GoTest - go test test
-	GoTest TestEntryKind = iota
-	// ShellTest - shell test.
-	ShellTest
-	// SuiteTest - go test suites
-	SuiteTest
+	// GoTestKind - go test test
+	GoTestKind TestEntryKind = iota
+	// ShellTestKind - shell test.
+	ShellTestKind
+	// SuiteTestKind - go test suites
+	SuiteTestKind
 )
 
 // TestEntry - represent one found test

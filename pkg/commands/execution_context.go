@@ -901,11 +901,11 @@ func (ctx *executionContext) startTask(task *testTask, instances []*clusterInsta
 
 	var runner runners.TestRunner
 	switch task.test.Kind {
-	case model.ShellTest:
+	case model.ShellTestKind:
 		runner = runners.NewShellTestRunner(task.clusterTaskID, task.test)
-	case model.GoTest:
+	case model.GoTestKind:
 		runner = runners.NewGoTestRunner(task.clusterTaskID, task.test, timeout)
-	case model.SuiteTest:
+	case model.SuiteTestKind:
 		runner = runners.NewSuiteRunner(task.clusterTaskID, task.test, timeout)
 	default:
 		return errors.New("invalid task runner")
@@ -1457,7 +1457,7 @@ func (ctx *executionContext) findShellTest(exec *config.Execution) []*model.Test
 	return []*model.TestEntry{
 		{
 			Name:            exec.Name,
-			Kind:            model.ShellTest,
+			Kind:            model.ShellTestKind,
 			Tags:            "",
 			ExecutionConfig: exec,
 			Status:          model.StatusAdded,
@@ -1480,7 +1480,7 @@ func (ctx *executionContext) findGoTest(executionConfig *config.Execution) ([]*m
 	}
 	logrus.Infof("Tests found: %v Elapsed: %v", len(execTests), time.Since(st))
 	for _, t := range execTests {
-		t.Kind = model.GoTest
+		t.Kind = model.GoTestKind
 		t.ExecutionConfig = executionConfig
 		if len(executionConfig.OnlyRun) == 0 || utils.Contains(executionConfig.OnlyRun, t.Name) {
 			result = append(result, t)
@@ -1506,7 +1506,7 @@ func (ctx *executionContext) findGoSuites(execution *config.Execution, allTests 
 		result = append(result, &model.TestEntry{
 			Name:            s.Name,
 			Tags:            strings.Join(execution.Source.Tags, ","),
-			Kind:            model.SuiteTest,
+			Kind:            model.SuiteTestKind,
 			Suite:           s,
 			ExecutionConfig: execution,
 		})
