@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Cisco Systems, Inc and/or its affiliates.
+// Copyright (c) 2020 Doc.ai and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -14,25 +14,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package utils
+package samples
 
 import (
-	"bufio"
-	"context"
-	"fmt"
-	"strings"
 	"testing"
-	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestProcessOutputShouldNotLostOutput(t *testing.T) {
-	const expected = "output..."
-	start := time.Now()
-	for time.Since(start) < time.Second {
-		output, err := RunCommand(context.Background(), fmt.Sprintf("echo \"%v\"", expected), "", func(s string) {}, bufio.NewWriter(&strings.Builder{}), nil, nil, true)
-		require.NoError(t, err)
-		require.Equal(t, expected, strings.TrimSpace(output))
-	}
+type Suite2 struct {
+	suite.Suite
+}
+
+func (s *Suite2) Test1() {
+}
+func (s *Suite2) Test2() {
+}
+func (s *Suite2) Test3() {
+}
+func (s *Suite2) Test4() {
+}
+func (s *Suite2) Setup() {
+}
+
+func FakeStart(t *testing.T) {
+	suite.Run(t, &Suite2{})
+}
+
+func TestEntryPoint5(t *testing.T) {
+	suite.Run(t, &Suite2{})
+}
+
+func TestEntryPoint6(t *testing.T) {
+	suite.Run(t, new(Suite2))
 }

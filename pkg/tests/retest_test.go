@@ -43,9 +43,8 @@ func TestRestartRequest(t *testing.T) {
 	testConfig.Timeout = 3000
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
 
@@ -96,9 +95,8 @@ func TestRestartRetestDestroyCluster(t *testing.T) {
 	testConfig.Timeout = 1000
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	p := createProvider(testConfig, "a_provider")
 	p.Instances = 1
@@ -158,9 +156,8 @@ func TestRestartRequestRestartCluster(t *testing.T) {
 	testConfig.Timeout = 1000
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	p := createProvider(testConfig, "a_provider")
 	p.Instances = 1
@@ -212,9 +209,8 @@ func TestRestartRequestSkip(t *testing.T) {
 	testConfig.Timeout = 3000
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
 
@@ -230,7 +226,7 @@ func TestRestartRequestSkip(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	require.NotNil(t, report)
 

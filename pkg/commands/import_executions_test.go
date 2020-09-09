@@ -30,7 +30,7 @@ func TestImportAll(t *testing.T) {
 		Imports: []string{"samples/.*"},
 	}
 	err := performImport(testConfig)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	files, _ := ioutil.ReadDir(testConfig.Imports[0][:len(testConfig.Imports[0])-1])
 	require.Len(t, files, len(testConfig.Executions))
 }
@@ -40,7 +40,7 @@ func TestImportPattern(t *testing.T) {
 		Imports: []string{"samples/.*2"},
 	}
 	err := performImport(testConfig)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Len(t, testConfig.Executions, 1)
 }
 
@@ -49,6 +49,6 @@ func TestSpecificImport(t *testing.T) {
 		Imports: []string{"samples/execution1.yaml"},
 	}
 	err := performImport(testConfig)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Len(t, testConfig.Executions, 1)
 }

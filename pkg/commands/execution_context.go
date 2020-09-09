@@ -31,6 +31,8 @@ import (
 	"sync"
 	"time"
 
+	suites2 "github.com/networkservicemesh/cloudtest/pkg/suites"
+
 	"github.com/pkg/errors"
 
 	"github.com/sirupsen/logrus"
@@ -725,21 +727,72 @@ func (ctx *executionContext) createTasks() {
 	}
 }
 
-func (ctx *executionContext) createTask(test *model.TestEntry, taskIndex, taskOrderIndex int) int {
-	selector := test.ExecutionConfig.ClusterSelector
-	// In case of one cluster, we create task copies and execute on every cloud.
+func (ctx *executionContext) splitTest(test *model.TestEntry, cluster *clustersGroup) []*model.TestEntry {
+	if test.Suite == nil {
+		return []*model.TestEntry{test}
+	}
+	var result []*model.TestEntry
+	countPerInstance := len(test.Suite.Tests) / len(cluster.instances)
+	if countPerInstance < ctx.cloudTestConfig.MinSuiteSize {
+		countPerInstance = ctx.cloudTestConfig.MinSuiteSize
+	}
+	for i := 0; i < len(cluster.instances); i++ {
+		splitTest := &model.TestEntry{
+			Kind:            test.Kind,
+			Name:            test.Name,
+			Tags:            test.Tags,
+			Status:          test.Status,
+			ExecutionConfig: test.ExecutionConfig,
+			Executions:      []model.TestEntryExecution{},
+			RunScript:       test.RunScript,
+		}
+		splitTest.Name += fmt.Sprint(i + 1)
+		splitTest.Suite = &model.Suite{
+			Name: test.Suite.Name,
+		}
+		if len(test.Suite.Tests)-(i+1)*countPerInstance < countPerInstance || i+1 == len(cluster.instances) {
+			splitTest.Suite.Tests = test.Suite.Tests[i*countPerInstance:]
+			result = append(result, splitTest)
+			return result
+		}
+		result = append(result, splitTest)
+		splitTest.Suite.Tests = test.Suite.Tests[i*countPerInstance : (i+1)*countPerInstance]
+	}
+	return result
+}
 
-	var task *testTask
-	if test.ExecutionConfig.ClusterCount > 1 {
+func (ctx *executionContext) createTask(entry *model.TestEntry, taskIndex, taskOrderIndex int) int {
+	selector := entry.ExecutionConfig.ClusterSelector
+	// In case of one cluster, we create task copies and execute on every cloud.
+	updateTaskStatus := func(task *testTask) {
+		if task == nil {
+			logrus.Errorf("%v: No clusters defined of required %+v", entry.Name, selector)
+			return
+		}
+		if len(task.clusters) < entry.ExecutionConfig.ClusterCount {
+			logrus.Errorf("%s: not all clusters defined of required %v", entry.Name, selector)
+			task.test.Status = model.StatusSkipped
+		} else {
+			task.clusterTaskID = makeTaskClusterID(task.clusters)
+		}
+	}
+	if entry.ExecutionConfig.ClusterCount > 1 {
+		var tasks []*testTask
 		for _, clusterName := range selector {
 			for _, cluster := range ctx.clusters {
 				if clusterName == cluster.config.Name {
-					if task == nil {
-						task = ctx.createSingleTask(taskIndex, test, cluster, taskOrderIndex)
-						taskIndex++
+					if len(tasks) == 0 {
+						for _, test := range ctx.splitTest(entry, cluster) {
+							task := ctx.createSingleTask(taskIndex, test, cluster, taskOrderIndex)
+							defer updateTaskStatus(task)
+							tasks = append(tasks, task)
+							taskIndex++
+						}
 					} else {
-						task.clusters = append(task.clusters, cluster)
-						cluster.tasks[task.test.Key] = task
+						for _, task := range tasks {
+							task.clusters = append(task.clusters, cluster)
+							cluster.tasks[task.test.Key] = task
+						}
 					}
 					break
 				}
@@ -749,19 +802,13 @@ func (ctx *executionContext) createTask(test *model.TestEntry, taskIndex, taskOr
 		for _, cluster := range ctx.clusters {
 			if len(selector) > 0 && utils.Contains(selector, cluster.config.Name) ||
 				len(selector) == 0 {
-				task = ctx.createSingleTask(taskIndex, test, cluster, taskOrderIndex)
-				taskIndex++
+				for _, test := range ctx.splitTest(entry, cluster) {
+					task := ctx.createSingleTask(taskIndex, test, cluster, taskOrderIndex)
+					updateTaskStatus(task)
+					taskIndex++
+				}
 			}
 		}
-	}
-
-	if task == nil {
-		logrus.Errorf("%s: no clusters defined of required %v", test.Name, selector)
-	} else if len(task.clusters) < test.ExecutionConfig.ClusterCount {
-		logrus.Errorf("%s: not all clusters defined of required %v", test.Name, selector)
-		task.test.Status = model.StatusSkipped
-	} else {
-		task.clusterTaskID = makeTaskClusterID(task.clusters)
 	}
 
 	return taskIndex
@@ -775,6 +822,7 @@ func (ctx *executionContext) createSingleTask(taskIndex int, test *model.TestEnt
 			Name:            test.Name,
 			Tags:            test.Tags,
 			Status:          test.Status,
+			Suite:           test.Suite,
 			ExecutionConfig: test.ExecutionConfig,
 			Executions:      []model.TestEntryExecution{},
 			RunScript:       test.RunScript,
@@ -853,10 +901,12 @@ func (ctx *executionContext) startTask(task *testTask, instances []*clusterInsta
 
 	var runner runners.TestRunner
 	switch task.test.Kind {
-	case model.TestEntryKindShellTest:
+	case model.ShellTestKind:
 		runner = runners.NewShellTestRunner(task.clusterTaskID, task.test)
-	case model.TestEntryKindGoTest:
+	case model.GoTestKind:
 		runner = runners.NewGoTestRunner(task.clusterTaskID, task.test, timeout)
+	case model.SuiteTestKind:
+		runner = runners.NewSuiteRunner(task.clusterTaskID, task.test, timeout)
 	default:
 		return errors.New("invalid task runner")
 	}
@@ -1006,7 +1056,6 @@ func (ctx *executionContext) executeTask(task *testTask, clusterConfigs []string
 	}
 
 	task.test.Duration = time.Since(st)
-
 	if errCode != nil {
 		// Check if cluster is alive.
 		clusterNotAvailable := false
@@ -1408,7 +1457,7 @@ func (ctx *executionContext) findShellTest(exec *config.Execution) []*model.Test
 	return []*model.TestEntry{
 		{
 			Name:            exec.Name,
-			Kind:            model.TestEntryKindShellTest,
+			Kind:            model.ShellTestKind,
 			Tags:            "",
 			ExecutionConfig: exec,
 			Status:          model.StatusAdded,
@@ -1425,10 +1474,13 @@ func (ctx *executionContext) findGoTest(executionConfig *config.Execution) ([]*m
 		logrus.Errorf("Failed during test lookup %v", err)
 		return nil, err
 	}
+	result, err := ctx.findGoSuites(executionConfig, execTests)
+	if err != nil {
+		return nil, errors.Wrapf(err, "an error during searching go suites")
+	}
 	logrus.Infof("Tests found: %v Elapsed: %v", len(execTests), time.Since(st))
-	var result []*model.TestEntry
 	for _, t := range execTests {
-		t.Kind = model.TestEntryKindGoTest
+		t.Kind = model.GoTestKind
 		t.ExecutionConfig = executionConfig
 		if len(executionConfig.OnlyRun) == 0 || utils.Contains(executionConfig.OnlyRun, t.Name) {
 			result = append(result, t)
@@ -1436,6 +1488,28 @@ func (ctx *executionContext) findGoTest(executionConfig *config.Execution) ([]*m
 	}
 	if len(result) != len(execTests) {
 		logrus.Infof("Tests after filtering: %v", len(result))
+	}
+	return result, nil
+}
+
+func (ctx *executionContext) findGoSuites(execution *config.Execution, allTests map[string]*model.TestEntry) ([]*model.TestEntry, error) {
+	suites, err := suites2.Find(execution.PackageRoot)
+	if err != nil {
+		return nil, err
+	}
+	var result []*model.TestEntry
+	for _, s := range suites {
+		if _, ok := allTests[s.Name]; !ok {
+			continue
+		}
+		delete(allTests, s.Name)
+		result = append(result, &model.TestEntry{
+			Name:            s.Name,
+			Tags:            strings.Join(execution.Source.Tags, ","),
+			Kind:            model.SuiteTestKind,
+			Suite:           s,
+			ExecutionConfig: execution,
+		})
 	}
 	return result, nil
 }

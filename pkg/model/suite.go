@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Cisco Systems, Inc and/or its affiliates.
+// Copyright (c) 2020 Doc.ai and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -14,25 +14,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package utils
+package model
 
-import (
-	"bufio"
-	"context"
-	"fmt"
-	"strings"
-	"testing"
-	"time"
-
-	"github.com/stretchr/testify/require"
-)
-
-func TestProcessOutputShouldNotLostOutput(t *testing.T) {
-	const expected = "output..."
-	start := time.Now()
-	for time.Since(start) < time.Second {
-		output, err := RunCommand(context.Background(), fmt.Sprintf("echo \"%v\"", expected), "", func(s string) {}, bufio.NewWriter(&strings.Builder{}), nil, nil, true)
-		require.NoError(t, err)
-		require.Equal(t, expected, strings.TrimSpace(output))
-	}
+type Suite struct {
+	Name  string
+	Tests []string
 }

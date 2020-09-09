@@ -35,9 +35,8 @@ func TestAfterWorksCorrectly(t *testing.T) {
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	provider := &config.ClusterProviderConfig{
 		Timeout:    100,
@@ -90,9 +89,8 @@ func TestBeforeWorksCorrectly(t *testing.T) {
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	provider := &config.ClusterProviderConfig{
 		Timeout:    100,

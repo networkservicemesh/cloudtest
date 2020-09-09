@@ -34,9 +34,8 @@ func TestClusterInstancesFailed(t *testing.T) {
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
 	failedP := createProvider(testConfig, "b_provider")
@@ -77,9 +76,8 @@ func TestClusterInstancesFailedSpecificTestList(t *testing.T) {
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
 
@@ -110,9 +108,8 @@ func TestClusterInstancesOnFailGoRunner(t *testing.T) {
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
 	failedP := createProvider(testConfig, "b_provider")
@@ -169,9 +166,8 @@ func TestClusterInstancesOnFailShellRunner(t *testing.T) {
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	createProvider(testConfig, "a_provider")
 	testConfig.Executions = append(testConfig.Executions, &config.Execution{
@@ -215,9 +211,8 @@ func TestClusterInstancesOnFailShellRunnerInterdomain(t *testing.T) {
 	testConfig.Timeout = 300
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig.ConfigRoot = tmpDir
 	ap := createProvider(testConfig, "a_provider")
 	ap.Scripts["config"] = "echo ./.tests/config.a"
@@ -247,6 +242,7 @@ func TestClusterInstancesOnFailShellRunnerInterdomain(t *testing.T) {
 	defer logKeeper.Stop()
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
+	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "there is failed tests 1")
 	foundFailTest := false
 

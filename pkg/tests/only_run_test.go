@@ -33,9 +33,8 @@ import (
 
 func TestOnlyRun(t *testing.T) {
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cloud-test-temp")
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	testConfig := config.NewCloudTestConfig()
 	testConfig.ConfigRoot = tmpDir
 	testConfig.Timeout = 300
@@ -53,7 +52,7 @@ func TestOnlyRun(t *testing.T) {
 	if err != nil {
 		logrus.Errorf("Testing failed: %v", err)
 	}
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, report)
 
 	rootSuite := report.Suites[0]

@@ -34,7 +34,7 @@ import (
 func TestClusterInstanceStates(t *testing.T) {
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), t.Name())
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
 
 	testConfig := config.NewCloudTestConfig()
@@ -68,7 +68,7 @@ func TestClusterInstanceStates(t *testing.T) {
 	ctx.cloudTestConfig.Statistics.Enabled = false
 
 	err = ctx.createClusters()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	require.Len(t, ctx.clusters, 2)
 	require.Len(t, ctx.clusters[0].instances, 1)
@@ -85,7 +85,7 @@ func TestClusterInstanceStates(t *testing.T) {
 	ctx.Unlock()
 
 	err = ctx.destroyCluster(ctx.clusters[0].instances[0], false, false)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	ctx.Lock()
 	require.Equal(t, ctx.clusters[0].instances[0].state, clusterStarting)
@@ -94,7 +94,7 @@ func TestClusterInstanceStates(t *testing.T) {
 	ctx.Unlock()
 
 	err = ctx.destroyCluster(ctx.clusters[0].instances[0], false, false)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	ctx.Lock()
 	require.Equal(t, ctx.clusters[0].instances[0].state, clusterCrashed)
 	ctx.Unlock()

@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Cisco Systems, Inc and/or its affiliates.
+// Copyright (c) 2019-2020 Cisco Systems, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -14,25 +14,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package utils
+package suites_test
 
 import (
-	"bufio"
-	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/networkservicemesh/cloudtest/pkg/suites"
 )
 
-func TestProcessOutputShouldNotLostOutput(t *testing.T) {
-	const expected = "output..."
-	start := time.Now()
-	for time.Since(start) < time.Second {
-		output, err := RunCommand(context.Background(), fmt.Sprintf("echo \"%v\"", expected), "", func(s string) {}, bufio.NewWriter(&strings.Builder{}), nil, nil, true)
-		require.NoError(t, err)
-		require.Equal(t, expected, strings.TrimSpace(output))
+func TestFind(t *testing.T) {
+	foundSuites, err := suites.Find("./samples")
+	require.NoError(t, err)
+	require.NotNil(t, foundSuites)
+	require.Len(t, foundSuites, 6)
+	sort.Slice(foundSuites, func(i, j int) bool {
+		return strings.Compare(foundSuites[i].Name, foundSuites[j].Name) == -1
+	})
+	for i, s := range foundSuites {
+		require.Equal(t, s.Name, fmt.Sprintf("TestEntryPoint%v", i+1))
 	}
+	require.Len(t, foundSuites[5].Tests, 4)
 }

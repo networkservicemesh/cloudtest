@@ -36,9 +36,8 @@ import (
 
 func TestUpdateTaskWithTimeout_ShouldNotCompleteTask(t *testing.T) {
 	tmpDir, err := ioutil.TempDir(os.TempDir(), t.Name())
+	require.NoError(t, err)
 	defer utils.ClearFolder(tmpDir, false)
-	require.Nil(t, err)
-
 	ctx := executionContext{
 		cloudTestConfig:  config.NewCloudTestConfig(),
 		manager:          execmanager.NewExecutionManager(tmpDir),

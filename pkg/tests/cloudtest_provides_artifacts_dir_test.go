@@ -33,12 +33,12 @@ func TestCloudtestProvidesArtifactsDirForEachTest(t *testing.T) {
 
 	testConfig.Timeout = 300
 	err := os.Mkdir(t.Name(), os.ModePerm)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = os.RemoveAll(t.Name())
 	}()
 	relativePath, err := ioutil.TempDir(t.Name(), "tmp")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	testConfig.ConfigRoot = relativePath
 	createProvider(testConfig, "provider")
@@ -55,8 +55,8 @@ func TestCloudtestProvidesArtifactsDirForEachTest(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	_, err = commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	require.Nil(t, err)
+	require.NoError(t, err)
 	content, err := ioutil.ReadFile(filepath.Join(relativePath, testConfig.Providers[0].Name+"-1", "TestArtifacts", "artifact1.txt"))
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, "test result", string(content))
 }
