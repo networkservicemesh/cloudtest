@@ -1617,6 +1617,7 @@ func (ctx *executionContext) generateClusterFailuresReportSuite() (time.Duration
 	failuresTime := time.Duration(0)
 	// Check cluster instances
 	for _, cluster := range ctx.clusters {
+		ctx.RLock()
 		availableClusters := 0
 		for _, inst := range cluster.instances {
 			if inst.state != clusterNotAvailable {
@@ -1626,16 +1627,15 @@ func (ctx *executionContext) generateClusterFailuresReportSuite() (time.Duration
 		if availableClusters == 0 {
 			// No clusters available let's mark this as error.
 			for _, inst := range cluster.instances {
-				if inst.state == clusterNotAvailable {
-					for _, exec := range inst.executions {
-						ctx.generateClusterFailedReportEntry(inst, exec, clusterFailuresSuite)
-						failuresTime += exec.duration
-						clusterFailures++
-						break
-					}
+				for _, exec := range inst.executions {
+					ctx.generateClusterFailedReportEntry(inst.id, exec, clusterFailuresSuite)
+					failuresTime += exec.duration
+					clusterFailures++
+					break
 				}
 			}
 		}
+		ctx.RUnlock()
 	}
 	clusterFailuresSuite.Time = fmt.Sprintf("%v", failuresTime.Seconds())
 	clusterFailuresSuite.TimeComment = fmt.Sprintf(reporting.TimeCommentFormat, failuresTime.Round(time.Second))
@@ -1670,8 +1670,8 @@ func (ctx *executionContext) getAllTestTasksGroupedByExecutions() map[string][]*
 	return executionsTests
 }
 
-func (ctx *executionContext) generateClusterFailedReportEntry(inst *clusterInstance, exec *clusterOperationRecord, suite *reporting.Suite) {
-	message := fmt.Sprintf("Cluster start failed %v", inst.id)
+func (ctx *executionContext) generateClusterFailedReportEntry(instID string, exec *clusterOperationRecord, suite *reporting.Suite) {
+	message := fmt.Sprintf("Cluster start failed %v", instID)
 	result := fmt.Sprintf("Error: %v\n", exec.errMsg)
 	if exec.logFile != "" {
 		lines, err := utils.ReadFile(exec.logFile)
@@ -1681,7 +1681,7 @@ func (ctx *executionContext) generateClusterFailedReportEntry(inst *clusterInsta
 		}
 	}
 	startCase := &reporting.TestCase{
-		Name: fmt.Sprintf("Startup-%v", inst.id),
+		Name: fmt.Sprintf("Startup-%v", instID),
 		Time: fmt.Sprintf("%v", exec.duration.Seconds()),
 	}
 	startCase.Failure = &reporting.Failure{
