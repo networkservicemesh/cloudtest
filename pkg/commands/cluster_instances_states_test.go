@@ -17,13 +17,12 @@
 package commands
 
 import (
+	"io/ioutil"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"io/ioutil"
 
 	"github.com/networkservicemesh/cloudtest/pkg/config"
 	"github.com/networkservicemesh/cloudtest/pkg/execmanager"
@@ -75,12 +74,19 @@ func TestClusterInstanceStates(t *testing.T) {
 	ctx.startCluster(ctx.clusters[0].instances[0])
 	ctx.startCluster(ctx.clusters[1].instances[0])
 
-	<-time.After(100 * time.Millisecond)
+	require.Eventually(t, func() bool {
+		ctx.Lock()
+		defer ctx.Unlock()
+		return ctx.clusters[0].instances[0].state == clusterReady &&
+			ctx.clusters[1].instances[0].state == clusterCrashed
+	}, 1*time.Second, 100*time.Millisecond, "Not equal: \n"+
+		"expected: %v, %v\n"+
+		"actual  : %v, %v",
+		clusterReady, clusterCrashed,
+		ctx.clusters[0].instances[0].state, ctx.clusters[1].instances[0].state,
+	)
 
 	ctx.Lock()
-	require.Equal(t, ctx.clusters[0].instances[0].state, clusterReady)
-	require.Equal(t, ctx.clusters[1].instances[0].state, clusterCrashed)
-
 	ctx.clusters[0].instances[0].state = clusterStarting
 	ctx.Unlock()
 
