@@ -343,10 +343,12 @@ func (ctx *executionContext) performShutdown() {
 			group := clG
 			for _, cInst := range group.instances {
 				curInst := cInst
+				ctx.Lock()
 				if curInst.taskCancel != nil {
 					logrus.Infof("Canceling currently running task")
 					curInst.taskCancel()
 				}
+				ctx.Unlock()
 				logrus.Infof("Schedule Closing cluster %v %v", group.config.Name, curInst.id)
 				ctx.clusterWaitGroup.Add(1)
 
