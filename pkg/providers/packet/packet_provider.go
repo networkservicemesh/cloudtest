@@ -85,6 +85,7 @@ type packetInstance struct {
 	params                   providers.InstanceOptions
 	started                  bool
 	keyIds                   []string
+	virtualNetworkList       []packngo.VirtualNetwork
 	hardwareReservationsList []string
 	facilitiesList           []string
 }
@@ -168,17 +169,19 @@ func (pi *packetInstance) Start(timeout time.Duration) (string, error) {
 		return "", err
 	}
 
+	var virtualNetworks *packngo.VirtualNetworkListResponse
+	virtualNetworks, _, err = pi.client.ProjectVirtualNetworks.List(pi.projectID, &packngo.ListOptions{})
+	if err != nil {
+		return "", err
+	}
+	pi.virtualNetworkList = virtualNetworks.VirtualNetworks
+
 	if pi.hardwareReservationsList, err = pi.findHardwareReservations(); err != nil {
 		return "", err
 	}
 	for _, devCfg := range pi.config.Packet.HardwareDevices {
-		var devReq *packngo.DeviceCreateRequest
-		devReq, err = pi.createRequest(devCfg)
-		if err != nil {
-			return "", nil
-		}
 		var device *packngo.Device
-		device, err = pi.createHardwareDevice(devReq, devCfg)
+		device, err = pi.createHardwareDevice(devCfg)
 		if err != nil {
 			return "", nil
 		}
@@ -189,13 +192,8 @@ func (pi *packetInstance) Start(timeout time.Duration) (string, error) {
 		return "", err
 	}
 	for _, devCfg := range pi.config.Packet.Devices {
-		var devReq *packngo.DeviceCreateRequest
-		devReq, err = pi.createRequest(&devCfg.HardwareDeviceConfig)
-		if err != nil {
-			return "", nil
-		}
 		var device *packngo.Device
-		device, err = pi.createFacilityDevice(devReq, devCfg)
+		device, err = pi.createFacilityDevice(devCfg)
 		if err != nil {
 			return "", nil
 		}
@@ -316,6 +314,68 @@ func (pi *packetInstance) waitDevicesStartup(context context.Context) error {
 	return nil
 }
 
+func (pi *packetInstance) createHardwareDevice(devCfg *config.HardwareDeviceConfig) (device *packngo.Device, err error) {
+	var devReq *packngo.DeviceCreateRequest
+	devReq, err = pi.createRequest(devCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	var response *packngo.Response
+	for _, hr := range pi.hardwareReservationsList {
+		devReq.HardwareReservationID = hr
+		device, response, err = pi.client.Devices.Create(devReq)
+		msg := fmt.Sprintf("HostName=%v\n%v - %v", devReq.Hostname, response, err)
+		logrus.Infof(fmt.Sprintf("%s-%v", pi.id, msg))
+		pi.manager.AddLog(pi.id, fmt.Sprintf("create-device-%s", devCfg.Name), msg)
+		if err == nil || err != nil &&
+			!strings.Contains(err.Error(), "has no provisionable") &&
+			!strings.Contains(err.Error(), "Oh snap, something went wrong") {
+			break
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if devCfg.Network != nil {
+		return pi.setupDeviceNetwork(device, devCfg.Network)
+	}
+	return device, nil
+}
+
+func (pi *packetInstance) createFacilityDevice(devCfg *config.FacilityDeviceConfig) (device *packngo.Device, err error) {
+	var devReq *packngo.DeviceCreateRequest
+	devReq, err = pi.createRequest(&devCfg.HardwareDeviceConfig)
+	if err != nil {
+		return nil, err
+	}
+	devReq.Plan = devCfg.Plan
+	devReq.BillingCycle = devCfg.BillingCycle
+
+	var response *packngo.Response
+	for i := range pi.hardwareReservationsList {
+		devReq.Facility = []string{pi.hardwareReservationsList[i]}
+		device, response, err = pi.client.Devices.Create(devReq)
+		msg := fmt.Sprintf("HostName=%v\n%v - %v", devReq.Hostname, response, err)
+		logrus.Infof(fmt.Sprintf("%s-%v", pi.id, msg))
+		pi.manager.AddLog(pi.id, fmt.Sprintf("create-device-%s", devCfg.Name), msg)
+		if err == nil || err != nil &&
+			!strings.Contains(err.Error(), "has no provisionable") &&
+			!strings.Contains(err.Error(), "Oh snap, something went wrong") {
+			break
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if devCfg.Network != nil {
+		return pi.setupDeviceNetwork(device, devCfg.Network)
+	}
+	return device, nil
+}
+
 func (pi *packetInstance) createRequest(devCfg *config.HardwareDeviceConfig) (*packngo.DeviceCreateRequest, error) {
 	finalEnv := pi.shellInterface.GetProcessedEnv()
 
@@ -341,47 +401,58 @@ func (pi *packetInstance) createRequest(devCfg *config.HardwareDeviceConfig) (*p
 	}, err
 }
 
-func (pi *packetInstance) createHardwareDevice(
-	devReq *packngo.DeviceCreateRequest,
-	devCfg *config.HardwareDeviceConfig,
-) (device *packngo.Device, err error) {
-	var response *packngo.Response
-	for _, hr := range pi.hardwareReservationsList {
-		devReq.HardwareReservationID = hr
-		device, response, err = pi.client.Devices.Create(devReq)
-		msg := fmt.Sprintf("HostName=%v\n%v - %v", devReq.Hostname, response, err)
-		logrus.Infof(fmt.Sprintf("%s-%v", pi.id, msg))
-		pi.manager.AddLog(pi.id, fmt.Sprintf("create-device-%s", devCfg.Name), msg)
-		if err == nil || err != nil &&
-			!strings.Contains(err.Error(), "has no provisionable") &&
-			!strings.Contains(err.Error(), "Oh snap, something went wrong") {
-			break
+func (pi *packetInstance) setupDeviceNetwork(device *packngo.Device, netCfg *config.NetworkConfig) (*packngo.Device, error) {
+	piAddLog := func(format string, a ...interface{}) {
+		pi.manager.AddLog(pi.id, "setup-device-network", fmt.Sprintf(format, a...))
+	}
+
+	var err error
+	defer func() {
+		if err != nil {
+			piAddLog("error: %v", err)
+		}
+	}()
+
+	device, err = pi.client.DevicePorts.DeviceToNetworkType(device.ID, string(netCfg.Type))
+	piAddLog("device to network type: %v -> %v", device.Hostname, netCfg.Type)
+	if err != nil {
+		return nil, err
+	}
+
+	for portName, vlanTag := range netCfg.PortVLANs {
+		var port *packngo.Port
+		port, err = pi.client.DevicePorts.GetPortByName(device.ID, portName)
+		if err != nil {
+			return nil, err
+		}
+
+		var vlan *packngo.VirtualNetwork
+		vlan, err = pi.findVlan(vlanTag)
+		if err != nil {
+			return nil, err
+		}
+
+		var response *packngo.Response
+		_, response, err = pi.client.DevicePorts.Assign(&packngo.PortAssignRequest{
+			PortID:           port.ID,
+			VirtualNetworkID: vlan.ID,
+		})
+		piAddLog("port to vlan: %v -> %v\n%v", portName, vlanTag, response)
+		if err != nil {
+			return nil, err
 		}
 	}
-	return device, err
+
+	return device, nil
 }
 
-func (pi *packetInstance) createFacilityDevice(
-	devReq *packngo.DeviceCreateRequest,
-	devCfg *config.FacilityDeviceConfig,
-) (device *packngo.Device, err error) {
-	devReq.Plan = devCfg.Plan
-	devReq.BillingCycle = devCfg.BillingCycle
-
-	var response *packngo.Response
-	for i := range pi.hardwareReservationsList {
-		devReq.Facility = []string{pi.hardwareReservationsList[i]}
-		device, response, err = pi.client.Devices.Create(devReq)
-		msg := fmt.Sprintf("HostName=%v\n%v - %v", devReq.Hostname, response, err)
-		logrus.Infof(fmt.Sprintf("%s-%v", pi.id, msg))
-		pi.manager.AddLog(pi.id, fmt.Sprintf("create-device-%s", devCfg.Name), msg)
-		if err == nil || err != nil &&
-			!strings.Contains(err.Error(), "has no provisionable") &&
-			!strings.Contains(err.Error(), "Oh snap, something went wrong") {
-			break
+func (pi *packetInstance) findVlan(vlanTag int) (*packngo.VirtualNetwork, error) {
+	for i := range pi.virtualNetworkList {
+		if vlan := &pi.virtualNetworkList[i]; vlan.VXLAN == vlanTag {
+			return vlan, nil
 		}
 	}
-	return device, err
+	return nil, errors.Errorf("vlan not found: %v", vlanTag)
 }
 
 func (pi *packetInstance) findHardwareReservations() ([]string, error) {
