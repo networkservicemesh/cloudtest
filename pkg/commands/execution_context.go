@@ -1266,16 +1266,18 @@ func (ctx *executionContext) monitorCluster(context context.Context, ci *cluster
 }
 
 func (ctx *executionContext) destroyCluster(ci *clusterInstance, sendUpdate, fork bool) error {
-	if ci.state == clusterCrashed || ci.state == clusterNotAvailable || ci.state == clusterShutdown || ci.state == clusterStarting {
+	ctx.Lock()
+	if ctx.isClusterDown(ci) || ci.state == clusterStarting {
 		// It is already destroyed or not available.
+		ctx.Unlock()
 		return nil
 	}
-	ctx.Lock()
 	ci.state = clusterStopping
 	if ci.cancelMonitor != nil {
 		ci.cancelMonitor()
 	}
 	ctx.Unlock()
+
 	timeout := ctx.getClusterTimeout(ci.group)
 	if fork {
 		ctx.clusterWaitGroup.Add(1)
@@ -1730,7 +1732,7 @@ func (ctx *executionContext) generateTestCaseReport(test *testTask, totalTests i
 	case model.StatusSkippedSinceNoClusters:
 		message := "No clusters are available, all clusters reached restart limits..."
 		// Treat the test as failed unless 1+ target cluster(s) was completely down
-		if hasFailedCluster(test) {
+		if ctx.hasFailedCluster(test) {
 			testCase.SkipMessage = &reporting.SkipMessage{
 				Message: message,
 			}
@@ -1747,14 +1749,16 @@ func (ctx *executionContext) generateTestCaseReport(test *testTask, totalTests i
 	return totalTests + 1, totalTime + test.test.Duration, failures
 }
 
-func hasFailedCluster(task *testTask) bool {
+func (ctx *executionContext) hasFailedCluster(task *testTask) bool {
 	for _, cg := range task.clusters {
 		failedInstances := 0
+		ctx.RLock()
 		for _, ci := range cg.instances {
 			if ci.state == clusterNotAvailable {
 				failedInstances++
 			}
 		}
+		ctx.RUnlock()
 		if failedInstances == len(cg.instances) {
 			return true
 		}
@@ -1774,12 +1778,17 @@ func (ctx *executionContext) checkClustersUsage() {
 			if up > 0 {
 				logrus.Infof("All tasks for cluster group %v are complete. Starting cluster shutdown.", ci.config.Name)
 				for _, inst := range ci.instances {
-					if !ctx.isClusterDown(inst) && inst.state != clusterBusy {
-						_ = ctx.destroyCluster(inst, false, true)
-						ctx.Lock()
-						inst.state = clusterShutdown
-						ctx.Unlock()
+					ctx.RLock()
+					if ctx.isClusterDown(inst) || inst.state == clusterBusy {
+						ctx.RUnlock()
+						continue
 					}
+					ctx.RUnlock()
+
+					_ = ctx.destroyCluster(inst, false, true)
+					ctx.Lock()
+					inst.state = clusterShutdown
+					ctx.Unlock()
 				}
 			}
 		}
