@@ -72,41 +72,30 @@ func TestClusterInstanceStates(t *testing.T) {
 	require.Len(t, ctx.clusters, 2)
 	require.Len(t, ctx.clusters[0].instances, 1)
 
-	ctx.Lock()
 	ctx.startCluster(ctx.clusters[0].instances[0])
 	ctx.startCluster(ctx.clusters[1].instances[0])
-	ctx.Unlock()
 
 	require.Eventually(t, func() bool {
-		ctx.Lock()
-		defer ctx.Unlock()
-		return ctx.clusters[0].instances[0].state == clusterReady &&
-			ctx.clusters[1].instances[0].state == clusterCrashed
+		return ctx.clusters[0].instances[0].state.load() == clusterReady &&
+			ctx.clusters[1].instances[0].state.load() == clusterCrashed
 	}, 1*time.Second, 100*time.Millisecond, "Not equal: \n"+
 		"expected: %v, %v\n"+
 		"actual  : %v, %v",
 		clusterReady, clusterCrashed,
-		ctx.clusters[0].instances[0].state, ctx.clusters[1].instances[0].state,
+		ctx.clusters[0].instances[0].state.load(), ctx.clusters[1].instances[0].state.load(),
 	)
 
-	ctx.Lock()
-	ctx.clusters[0].instances[0].state = clusterStarting
-	ctx.Unlock()
+	ctx.clusters[0].instances[0].state.store(clusterStarting)
 
 	err = ctx.destroyCluster(ctx.clusters[0].instances[0], false, false)
 	require.NoError(t, err)
+	require.Equal(t, ctx.clusters[0].instances[0].state.load(), clusterStarting)
 
-	ctx.Lock()
-	require.Equal(t, ctx.clusters[0].instances[0].state, clusterStarting)
-
-	ctx.clusters[0].instances[0].state = clusterStopping
-	ctx.Unlock()
+	ctx.clusters[0].instances[0].state.store(clusterStopping)
 
 	err = ctx.destroyCluster(ctx.clusters[0].instances[0], false, false)
 	require.NoError(t, err)
-	ctx.Lock()
-	require.Equal(t, ctx.clusters[0].instances[0].state, clusterCrashed)
-	ctx.Unlock()
+	require.Equal(t, ctx.clusters[0].instances[0].state.load(), clusterCrashed)
 }
 
 func createProvider(testConfig *config.CloudTestConfig, name, startScript string) *config.ClusterProviderConfig {
