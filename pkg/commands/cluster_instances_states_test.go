@@ -71,8 +71,11 @@ func TestClusterInstanceStates(t *testing.T) {
 
 	require.Len(t, ctx.clusters, 2)
 	require.Len(t, ctx.clusters[0].instances, 1)
+
+	ctx.Lock()
 	ctx.startCluster(ctx.clusters[0].instances[0])
 	ctx.startCluster(ctx.clusters[1].instances[0])
+	ctx.Unlock()
 
 	require.Eventually(t, func() bool {
 		ctx.Lock()
