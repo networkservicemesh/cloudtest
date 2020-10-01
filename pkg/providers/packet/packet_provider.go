@@ -43,11 +43,11 @@ import (
 const (
 	installScript   = "install" // #1
 	setupScript     = "setup"   // #2
-	startScript     = "start"   // #4
-	configScript    = "config"  // #5
-	prepareScript   = "prepare" // #6
-	stopScript      = "stop"    // #7
-	cleanupScript   = "cleanup" // #8
+	startScript     = "start"   // #3
+	configScript    = "config"  // #4
+	prepareScript   = "prepare" // #5
+	stopScript      = "stop"    // #6
+	cleanupScript   = "cleanup" // #7
 	packetProjectID = "PACKET_PROJECT_ID"
 )
 
