@@ -33,12 +33,12 @@ type HardwareDeviceConfig struct {
 	HostName        string         `yaml:"host-name"` // Host name with variable substitutions supported.
 	OperatingSystem string         `yaml:"os"`        // Operating system
 	Name            string         `yaml:"name"`      // Host name prefix, will create ENV variable IP_HostName
+	BillingCycle    string         `yaml:"billing-cycle"`
 	Network         *NetworkConfig `yaml:"network"`
 }
 
 type FacilityDeviceConfig struct {
-	Plan         string `yaml:"plan"` // Plan
-	BillingCycle string `yaml:"billing-cycle"`
+	Plan string `yaml:"plan"` // Plan
 
 	HardwareDeviceConfig `yaml:",inline"`
 }

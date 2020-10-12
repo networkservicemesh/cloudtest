@@ -145,7 +145,7 @@ func deleteClusters(cmd *packetCleanupCmd, helper *packethelper.PacketHelper) {
 			if checkPrefix(d.Hostname, cmd.cmdArguments.clusterPrefix) {
 				if sinceValue > cmd.cmdArguments.clusterLifetime {
 					logrus.Infof("-----> Cluster %s is marked for deletion.", d.Hostname)
-					_, errd := helper.Client.Devices.Delete(d.ID)
+					_, errd := helper.Client.Devices.Delete(d.ID, true)
 					if errd != nil {
 						logrus.Errorf("Error during delete %v", errd)
 					}
