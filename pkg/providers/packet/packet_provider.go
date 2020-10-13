@@ -28,9 +28,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/packethost/packngo"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/networkservicemesh/cloudtest/pkg/config"
@@ -42,13 +41,13 @@ import (
 )
 
 const (
-	installScript   = "install" //#1
-	setupScript     = "setup"   //#2
-	startScript     = "start"   //#4
-	configScript    = "config"  //#5
-	prepareScript   = "prepare" //#6
-	stopScript      = "stop"    // #7
-	cleanupScript   = "cleanup" // #8
+	installScript   = "install" // #1
+	setupScript     = "setup"   // #2
+	startScript     = "start"   // #3
+	configScript    = "config"  // #4
+	prepareScript   = "prepare" // #5
+	stopScript      = "stop"    // #6
+	cleanupScript   = "cleanup" // #7
 	packetProjectID = "PACKET_PROJECT_ID"
 )
 
@@ -61,32 +60,34 @@ type packetProvider struct {
 }
 
 type packetInstance struct {
-	installScript  []string
-	setupScript    []string
-	startScript    []string
-	prepareScript  []string
-	stopScript     []string
-	manager        execmanager.ExecutionManager
-	root           string
-	id             string
-	configScript   string
-	factory        k8s.ValidationFactory
-	validator      k8s.KubernetesValidator
-	configLocation string
-	shellInterface shell.Manager
-	projectID      string
-	packetAuthKey  string
-	keyID          string
-	config         *config.ClusterProviderConfig
-	provider       *packetProvider
-	client         *packngo.Client
-	project        *packngo.Project
-	devices        map[string]*packngo.Device
-	sshKey         *packngo.SSHKey
-	params         providers.InstanceOptions
-	started        bool
-	keyIds         []string
-	facilitiesList []string
+	installScript            []string
+	setupScript              []string
+	startScript              []string
+	prepareScript            []string
+	stopScript               []string
+	manager                  execmanager.ExecutionManager
+	root                     string
+	id                       string
+	configScript             string
+	factory                  k8s.ValidationFactory
+	validator                k8s.KubernetesValidator
+	configLocation           string
+	shellInterface           shell.Manager
+	projectID                string
+	packetAuthKey            string
+	keyID                    string
+	config                   *config.ClusterProviderConfig
+	provider                 *packetProvider
+	client                   *packngo.Client
+	project                  *packngo.Project
+	devices                  map[string]*packngo.Device
+	sshKey                   *packngo.SSHKey
+	params                   providers.InstanceOptions
+	started                  bool
+	keyIds                   []string
+	virtualNetworkList       []packngo.VirtualNetwork
+	hardwareReservationsList []*packngo.HardwareReservation
+	facilitiesList           []string
 }
 
 func (pi *packetInstance) GetID() string {
@@ -142,7 +143,7 @@ func (pi *packetInstance) Start(timeout time.Duration) (string, error) {
 		return fileName, err
 	}
 
-	keyFile := pi.config.Packet.SshKey
+	keyFile := pi.config.Packet.SSHKey
 	if !utils.FileExists(keyFile) {
 		// Relative file
 		keyFile = path.Join(pi.root, keyFile)
@@ -168,23 +169,61 @@ func (pi *packetInstance) Start(timeout time.Duration) (string, error) {
 		return "", err
 	}
 
+	var virtualNetworks *packngo.VirtualNetworkListResponse
+	virtualNetworks, _, err = pi.client.ProjectVirtualNetworks.List(pi.projectID, &packngo.ListOptions{})
+	if err != nil {
+		return "", err
+	}
+	pi.virtualNetworkList = virtualNetworks.VirtualNetworks
+
+	netCfgs := map[string]*config.NetworkConfig{}
+
+	if pi.hardwareReservationsList, err = pi.findHardwareReservations(); err != nil {
+		return "", err
+	}
+	for _, devCfg := range pi.config.Packet.HardwareDevices {
+		var device *packngo.Device
+		device, err = pi.createHardwareDevice(devCfg)
+		if err != nil {
+			return "", err
+		}
+		pi.devices[devCfg.Name] = device
+
+		if devCfg.Network != nil {
+			netCfgs[devCfg.Name] = devCfg.Network
+		}
+	}
+
 	if pi.facilitiesList, err = pi.findFacilities(); err != nil {
 		return "", err
 	}
 	for _, devCfg := range pi.config.Packet.Devices {
 		var device *packngo.Device
-		if device, err = pi.createDevice(devCfg); err != nil {
+		device, err = pi.createFacilityDevice(devCfg)
+		if err != nil {
 			return "", err
 		}
 		pi.devices[devCfg.Name] = device
+
+		if devCfg.Network != nil {
+			netCfgs[devCfg.Name] = devCfg.Network
+		}
 	}
 
 	// All devices are created so we need to wait for them to get alive.
 	if err = pi.waitDevicesStartup(ctx); err != nil {
 		return "", err
 	}
-	// We need to add arguments
 
+	// Setup network
+	for name, netCfg := range netCfgs {
+		err = pi.setupDeviceNetwork(pi.devices[name], netCfg)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// We need to add arguments
 	pi.addDeviceContextArguments()
 
 	printableEnv := pi.shellInterface.PrintEnv(pi.shellInterface.GetProcessedEnv())
@@ -293,7 +332,56 @@ func (pi *packetInstance) waitDevicesStartup(context context.Context) error {
 	return nil
 }
 
-func (pi *packetInstance) createDevice(devCfg *config.DeviceConfig) (*packngo.Device, error) {
+func (pi *packetInstance) createHardwareDevice(devCfg *config.HardwareDeviceConfig) (device *packngo.Device, err error) {
+	var devReq *packngo.DeviceCreateRequest
+	devReq, err = pi.createRequest(devCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	var response *packngo.Response
+	for _, hr := range pi.hardwareReservationsList {
+		devReq.Plan = hr.Plan.Slug
+		devReq.Facility = []string{hr.Facility.Code}
+		devReq.HardwareReservationID = hr.ID
+		device, response, err = pi.client.Devices.Create(devReq)
+		msg := fmt.Sprintf("HostName=%v\n%v - %v", devReq.Hostname, response, err)
+		logrus.Infof(fmt.Sprintf("%s-%v", pi.id, msg))
+		pi.manager.AddLog(pi.id, fmt.Sprintf("create-device-%s", devCfg.Name), msg)
+		if err == nil || err != nil &&
+			!strings.Contains(err.Error(), "is not provisionable") &&
+			!strings.Contains(err.Error(), "Oh snap, something went wrong") {
+			break
+		}
+	}
+	return device, err
+}
+
+func (pi *packetInstance) createFacilityDevice(devCfg *config.FacilityDeviceConfig) (device *packngo.Device, err error) {
+	var devReq *packngo.DeviceCreateRequest
+	devReq, err = pi.createRequest(&devCfg.HardwareDeviceConfig)
+	if err != nil {
+		return nil, err
+	}
+	devReq.Plan = devCfg.Plan
+
+	var response *packngo.Response
+	for i := range pi.facilitiesList {
+		devReq.Facility = []string{pi.facilitiesList[i]}
+		device, response, err = pi.client.Devices.Create(devReq)
+		msg := fmt.Sprintf("HostName=%v\n%v - %v", devReq.Hostname, response, err)
+		logrus.Infof(fmt.Sprintf("%s-%v", pi.id, msg))
+		pi.manager.AddLog(pi.id, fmt.Sprintf("create-device-%s", devCfg.Name), msg)
+		if err == nil || err != nil &&
+			!strings.Contains(err.Error(), "has no provisionable") &&
+			!strings.Contains(err.Error(), "Oh snap, something went wrong") {
+			break
+		}
+	}
+	return device, err
+}
+
+func (pi *packetInstance) createRequest(devCfg *config.HardwareDeviceConfig) (*packngo.DeviceCreateRequest, error) {
 	finalEnv := pi.shellInterface.GetProcessedEnv()
 
 	environment := map[string]string{}
@@ -310,30 +398,92 @@ func (pi *packetInstance) createDevice(devCfg *config.DeviceConfig) (*packngo.De
 		return nil, err
 	}
 
-	devReq := &packngo.DeviceCreateRequest{
-		Plan:           devCfg.Plan,
-		Facility:       pi.facilitiesList,
+	return &packngo.DeviceCreateRequest{
 		Hostname:       hostName,
-		BillingCycle:   devCfg.BillingCycle,
 		OS:             devCfg.OperatingSystem,
+		BillingCycle:   devCfg.BillingCycle,
 		ProjectID:      pi.projectID,
 		ProjectSSHKeys: pi.keyIds,
+	}, err
+}
+
+func (pi *packetInstance) setupDeviceNetwork(device *packngo.Device, netCfg *config.NetworkConfig) error {
+	piAddLog := func(format string, a ...interface{}) {
+		pi.manager.AddLog(pi.id, "setup-device-network", fmt.Sprintf(format, a...))
 	}
-	var device *packngo.Device
-	var response *packngo.Response
-	for i := 0; i < len(pi.facilitiesList); i++ {
-		devReq.Facility = []string{pi.facilitiesList[i]}
-		device, response, err = pi.client.Devices.Create(devReq)
-		msg := fmt.Sprintf("HostName=%v\n%v - %v", hostName, response, err)
-		logrus.Infof(fmt.Sprintf("%s-%v", pi.id, msg))
-		pi.manager.AddLog(pi.id, fmt.Sprintf("create-device-%s", devCfg.Name), msg)
-		if err == nil || err != nil &&
-			!strings.Contains(err.Error(), "has no provisionable") &&
-			!strings.Contains(err.Error(), "Oh snap, something went wrong") {
-			break
+
+	var err error
+	defer func() {
+		if err != nil {
+			piAddLog("error: %v", err)
+		}
+	}()
+
+	piAddLog("device to network type: %v -> %v", device.Hostname, netCfg.Type)
+	device, err = pi.client.DevicePorts.DeviceToNetworkType(device.ID, string(netCfg.Type))
+	if err != nil {
+		return err
+	}
+
+	for portName, vlanTag := range netCfg.PortVLANs {
+		var port *packngo.Port
+		port, err = pi.client.DevicePorts.GetPortByName(device.ID, portName)
+		if err != nil {
+			return err
+		}
+
+		var vlan *packngo.VirtualNetwork
+		vlan, err = pi.findVlan(vlanTag)
+		if err != nil {
+			return err
+		}
+
+		var response *packngo.Response
+		_, response, err = pi.client.DevicePorts.Assign(&packngo.PortAssignRequest{
+			PortID:           port.ID,
+			VirtualNetworkID: vlan.ID,
+		})
+		piAddLog("port to vlan: %v -> %v\n%v", portName, vlanTag, response)
+		if err != nil {
+			return err
 		}
 	}
-	return device, err
+
+	return nil
+}
+
+func (pi *packetInstance) findVlan(vlanTag int) (*packngo.VirtualNetwork, error) {
+	for i := range pi.virtualNetworkList {
+		if vlan := &pi.virtualNetworkList[i]; vlan.VXLAN == vlanTag {
+			return vlan, nil
+		}
+	}
+	return nil, errors.Errorf("vlan not found: %v", vlanTag)
+}
+
+func (pi *packetInstance) findHardwareReservations() ([]*packngo.HardwareReservation, error) {
+	hardwareReservations, response, err := pi.client.HardwareReservations.List(pi.projectID, &packngo.ListOptions{
+		Includes: []string{"facility"},
+	})
+
+	out := strings.Builder{}
+	_, _ = out.WriteString(fmt.Sprintf("%v\n%v\n", response.String(), err))
+
+	if err != nil {
+		pi.manager.AddLog(pi.id, "list-hardware-reservations", out.String())
+		return nil, err
+	}
+
+	var hardwareReservationsList []*packngo.HardwareReservation
+	for i := range hardwareReservations {
+		hr := &hardwareReservations[i]
+		for _, hrr := range pi.config.Packet.HardwareReservations {
+			if hrr == hr.ID {
+				hardwareReservationsList = append(hardwareReservationsList, hr)
+			}
+		}
+	}
+	return hardwareReservationsList, nil
 }
 
 func (pi *packetInstance) findFacilities() ([]string, error) {
@@ -347,7 +497,7 @@ func (pi *packetInstance) findFacilities() ([]string, error) {
 		return nil, err
 	}
 
-	facilitiesList := []string{}
+	var facilitiesList []string
 	for _, f := range facilities {
 		facilityReqs := map[string]string{}
 		for _, ff := range f.Features {
@@ -423,7 +573,7 @@ func (pi *packetInstance) Destroy(timeout time.Duration) error {
 					continue
 				}
 				if updatedDevice.State != "provisioning" && updatedDevice.State != "queued" {
-					response, err := pi.client.Devices.Delete(device.ID)
+					response, err := pi.client.Devices.Delete(device.ID, true)
 					if err != nil {
 						_, _ = logFile.WriteString(fmt.Sprintf("delete-device-error-%s => %v\n%v ", key, response, err))
 						logrus.Errorf("%v Failed to delete device %v", pi.id, device.ID)
@@ -566,7 +716,7 @@ func (pi *packetInstance) findKeys(out io.StringWriter) (*packngo.SSHKey, []stri
 				ID:          kk.ID,
 				Label:       kk.Label,
 				URL:         kk.URL,
-				User:        kk.User,
+				Owner:       kk.Owner,
 				Key:         kk.Key,
 				FingerPrint: kk.FingerPrint,
 				Created:     kk.Created,
@@ -673,12 +823,18 @@ func (p *packetProvider) ValidateConfig(config *config.ClusterProviderConfig) er
 		return errors.New("packet configuration element should be specified")
 	}
 
-	if len(config.Packet.Facilities) == 0 {
-		return errors.New("packet configuration facilities should be specified")
+	isHardware := len(config.Packet.HardwareDevices) > 0
+	isFacility := len(config.Packet.Devices) > 0
+	if !isHardware && !isFacility {
+		return errors.New("packet configuration devices should be specified")
 	}
 
-	if len(config.Packet.Devices) == 0 {
-		return errors.New("packet configuration devices should be specified")
+	if isHardware && len(config.Packet.HardwareReservations) == 0 {
+		return errors.New("packet hardware reservations should be specified")
+	}
+
+	if isFacility && len(config.Packet.Facilities) == 0 {
+		return errors.New("packet configuration facilities should be specified")
 	}
 
 	if _, ok := config.Scripts[configScript]; !ok {
@@ -711,7 +867,7 @@ func (p *packetProvider) ValidateConfig(config *config.ClusterProviderConfig) er
 
 	envValue = os.Getenv("PACKET_PROJECT_ID")
 	if envValue == "" {
-		return errors.New("environment variable are not specified PACKET_AUTH_TOKEN")
+		return errors.New("environment variable are not specified PACKET_PROJECT_ID")
 	}
 
 	return nil

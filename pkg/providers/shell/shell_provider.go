@@ -38,10 +38,10 @@ import (
 )
 
 const (
-	installScript = "install" //#1
-	startScript   = "start"   //#2
-	configScript  = "config"  //#3
-	prepareScript = "prepare" //#4
+	installScript = "install" // #1
+	startScript   = "start"   // #2
+	configScript  = "config"  // #3
+	prepareScript = "prepare" // #4
 	stopScript    = "stop"    // #5
 	cleanupScript = "cleanup" // #6
 	zoneSelector  = "zone-selector"

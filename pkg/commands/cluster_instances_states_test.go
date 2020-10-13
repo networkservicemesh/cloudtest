@@ -17,13 +17,12 @@
 package commands
 
 import (
+	"io/ioutil"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"io/ioutil"
 
 	"github.com/networkservicemesh/cloudtest/pkg/config"
 	"github.com/networkservicemesh/cloudtest/pkg/execmanager"
@@ -72,32 +71,31 @@ func TestClusterInstanceStates(t *testing.T) {
 
 	require.Len(t, ctx.clusters, 2)
 	require.Len(t, ctx.clusters[0].instances, 1)
+
 	ctx.startCluster(ctx.clusters[0].instances[0])
 	ctx.startCluster(ctx.clusters[1].instances[0])
 
-	<-time.After(100 * time.Millisecond)
+	require.Eventually(t, func() bool {
+		return ctx.clusters[0].instances[0].state.load() == clusterReady &&
+			ctx.clusters[1].instances[0].state.load() == clusterCrashed
+	}, 1*time.Second, 100*time.Millisecond, "Not equal: \n"+
+		"expected: %v, %v\n"+
+		"actual  : %v, %v",
+		clusterReady, clusterCrashed,
+		ctx.clusters[0].instances[0].state.load(), ctx.clusters[1].instances[0].state.load(),
+	)
 
-	ctx.Lock()
-	require.Equal(t, ctx.clusters[0].instances[0].state, clusterReady)
-	require.Equal(t, ctx.clusters[1].instances[0].state, clusterCrashed)
-
-	ctx.clusters[0].instances[0].state = clusterStarting
-	ctx.Unlock()
-
-	err = ctx.destroyCluster(ctx.clusters[0].instances[0], false, false)
-	require.NoError(t, err)
-
-	ctx.Lock()
-	require.Equal(t, ctx.clusters[0].instances[0].state, clusterStarting)
-
-	ctx.clusters[0].instances[0].state = clusterStopping
-	ctx.Unlock()
+	ctx.clusters[0].instances[0].state.store(clusterStarting)
 
 	err = ctx.destroyCluster(ctx.clusters[0].instances[0], false, false)
 	require.NoError(t, err)
-	ctx.Lock()
-	require.Equal(t, ctx.clusters[0].instances[0].state, clusterCrashed)
-	ctx.Unlock()
+	require.Equal(t, ctx.clusters[0].instances[0].state.load(), clusterStarting)
+
+	ctx.clusters[0].instances[0].state.store(clusterStopping)
+
+	err = ctx.destroyCluster(ctx.clusters[0].instances[0], false, false)
+	require.NoError(t, err)
+	require.Equal(t, ctx.clusters[0].instances[0].state.load(), clusterCrashed)
 }
 
 func createProvider(testConfig *config.CloudTestConfig, name, startScript string) *config.ClusterProviderConfig {

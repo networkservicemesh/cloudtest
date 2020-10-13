@@ -17,21 +17,6 @@
 // Package config - define a configuration used by CloudTest tool.
 package config
 
-type DeviceConfig struct {
-	Plan            string `yaml:"plan"` // Plan
-	OperatingSystem string `yaml:"os"`   // Operating system
-	BillingCycle    string `yaml:"billing-cycle"`
-	Name            string `yaml:"name"`      // Host name prefix, will create ENV variable IP_HostName
-	HostName        string `yaml:"host-name"` // Host name with variable substitutions supported.
-}
-
-type PacketConfig struct {
-	Devices           []*DeviceConfig `yaml:"devices"`            // A set of device configuration required to be created before starting cluster.
-	Facilities        []string        `yaml:"facilities"`         // A set of facility filters
-	PreferredFacility string          `yaml:"preferred-facility"` // A preferred facility key
-	SshKey            string          `yaml:"ssh-key"`            // A location of ssh key
-}
-
 type ClusterProviderConfig struct {
 	Name       string            `yaml:"name"`       // name of provider, GKE, Azure, etc.
 	Kind       string            `yaml:"kind"`       // register provider type, 'shell', 'packet'
@@ -62,7 +47,7 @@ type Execution struct {
 	Name            string          `yaml:"name"`             // Execution name
 	OnlyRun         []string        `yaml:"only-run"`         // If non-empty, only run the listed tests
 	PackageRoot     string          `yaml:"root"`             // A package root for this test execution, default .
-	Timeout         int64           `yaml:"timeout"`          // Invidiaul test timeout, "60" passed to gotest, in seconds
+	Timeout         int64           `yaml:"timeout"`          // Individual test timeout, "60" passed to gotest, in seconds
 	ExtraOptions    []string        `yaml:"extra-options"`    // Extra options to pass to gotest
 	ClusterCount    int             `yaml:"cluster-count"`    // A number of clusters required for this execution, default 1
 	ClusterEnv      []string        `yaml:"cluster-env"`      // Names of environment variables to put cluster names inside.

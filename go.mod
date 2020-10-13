@@ -3,9 +3,10 @@ module github.com/networkservicemesh/cloudtest
 go 1.15
 
 require (
+	github.com/antonfisher/nested-logrus-formatter v1.3.0
 	github.com/edwarnicke/exechelper v1.0.1
 	github.com/google/uuid v1.1.1
-	github.com/packethost/packngo v0.2.0
+	github.com/packethost/packngo v0.4.1
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v1.0.0
