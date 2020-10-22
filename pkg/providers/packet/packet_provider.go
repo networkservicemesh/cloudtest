@@ -348,9 +348,9 @@ func (pi *packetInstance) createHardwareDevice(devCfg *config.HardwareDeviceConf
 		msg := fmt.Sprintf("HostName=%v\n%v - %v", devReq.Hostname, response, err)
 		logrus.Infof(fmt.Sprintf("%s-%v", pi.id, msg))
 		pi.manager.AddLog(pi.id, fmt.Sprintf("create-device-%s", devCfg.Name), msg)
-		if err == nil || err != nil &&
+		if err == nil ||
 			!strings.Contains(err.Error(), "is not provisionable") &&
-			!strings.Contains(err.Error(), "Oh snap, something went wrong") {
+				!strings.Contains(err.Error(), "Oh snap, something went wrong") {
 			break
 		}
 	}
@@ -372,9 +372,9 @@ func (pi *packetInstance) createFacilityDevice(devCfg *config.FacilityDeviceConf
 		msg := fmt.Sprintf("HostName=%v\n%v - %v", devReq.Hostname, response, err)
 		logrus.Infof(fmt.Sprintf("%s-%v", pi.id, msg))
 		pi.manager.AddLog(pi.id, fmt.Sprintf("create-device-%s", devCfg.Name), msg)
-		if err == nil || err != nil &&
+		if err == nil ||
 			!strings.Contains(err.Error(), "has no provisionable") &&
-			!strings.Contains(err.Error(), "Oh snap, something went wrong") {
+				!strings.Contains(err.Error(), "Oh snap, something went wrong") {
 			break
 		}
 	}
@@ -415,11 +415,11 @@ func (pi *packetInstance) setupDeviceNetwork(device *packngo.Device, netCfg *con
 	var err error
 	defer func() {
 		if err != nil {
-			piAddLog("error: %v", err)
+			piAddLog("error: %v\n", err)
 		}
 	}()
 
-	piAddLog("device to network type: %v -> %v", device.Hostname, netCfg.Type)
+	piAddLog("device to network type: %v -> %v\n", device.Hostname, netCfg.Type)
 	device, err = pi.client.DevicePorts.DeviceToNetworkType(device.ID, string(netCfg.Type))
 	if err != nil {
 		return err
@@ -438,12 +438,18 @@ func (pi *packetInstance) setupDeviceNetwork(device *packngo.Device, netCfg *con
 			return err
 		}
 
-		var response *packngo.Response
-		_, response, err = pi.client.DevicePorts.Assign(&packngo.PortAssignRequest{
-			PortID:           port.ID,
-			VirtualNetworkID: vlan.ID,
-		})
-		piAddLog("port to vlan: %v -> %v\n%v", portName, vlanTag, response)
+		piAddLog("port to vlan: %v -> %v\n", portName, vlanTag)
+		for i := 0; i < 100; i++ {
+			_, _, err = pi.client.DevicePorts.Assign(&packngo.PortAssignRequest{
+				PortID:           port.ID,
+				VirtualNetworkID: vlan.ID,
+			})
+			if err == nil ||
+				!strings.Contains(err.Error(), "still bonded") {
+				break
+			}
+			<-time.After(5 * time.Second)
+		}
 		if err != nil {
 			return err
 		}
