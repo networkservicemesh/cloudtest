@@ -42,8 +42,9 @@ func (s *SuiteRunner) Run(ctx context.Context, envs []string, writer *bufio.Writ
 		exechelper.WithStdout(writer),
 		exechelper.WithStderr(writer),
 		exechelper.WithContext(ctx),
-		exechelper.WithDir(s.test.ExecutionConfig.PackageRoot))
-	exechelper.WithEnvirons(envs...)
+		exechelper.WithDir(s.test.ExecutionConfig.PackageRoot),
+		exechelper.WithEnvirons(envs...),
+	)
 	return err
 }
 
