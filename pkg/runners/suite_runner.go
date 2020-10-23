@@ -37,13 +37,14 @@ type SuiteRunner struct {
 }
 
 func (s *SuiteRunner) Run(ctx context.Context, envs []string, writer *bufio.Writer) error {
-	envs = append(envs, s.envManager.GetProcessedEnv()...)
+	envs = append(append(envs, s.envManager.GetProcessedEnv()...), os.Environ()...)
 	err := exechelper.Run(s.cmd,
 		exechelper.WithStdout(writer),
 		exechelper.WithStderr(writer),
 		exechelper.WithContext(ctx),
-		exechelper.WithDir(s.test.ExecutionConfig.PackageRoot))
-	exechelper.WithEnvirons(envs...)
+		exechelper.WithDir(s.test.ExecutionConfig.PackageRoot),
+		exechelper.WithEnvirons(envs...),
+	)
 	return err
 }
 
