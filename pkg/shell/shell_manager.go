@@ -20,9 +20,11 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
+	"github.com/edwarnicke/exechelper"
 	"github.com/sirupsen/logrus"
 
 	"github.com/networkservicemesh/cloudtest/pkg/config"
@@ -76,6 +78,19 @@ func (si *shellInterface) RunRead(context context.Context, operation string, scr
 	_, response, err := si.runCmd(context, operation, script, env, true)
 	return response, err
 }
+
+type bufferedWriter struct {
+	buffer   io.Writer
+	original io.Writer
+}
+
+func (b *bufferedWriter) Write(p []byte) (n int, err error) {
+	_, _ = b.buffer.Write(p)
+	return b.original.Write(p)
+}
+
+var _ io.Writer = (*bufferedWriter)(nil)
+
 func (si *shellInterface) runCmd(context context.Context, operation string, script, env []string, returnResult bool) (string, string, error) {
 	fileName, fileRef, err := si.manager.OpenFile(si.id, operation)
 	if err != nil {
@@ -100,18 +115,36 @@ func (si *shellInterface) runCmd(context context.Context, operation string, scri
 		_ = writer.Flush()
 
 		logrus.Infof("%s: %s => %s", operation, si.id, cmd)
-
-		logger := func(s string) {
-			// logrus.Infof("%s: %s -> %v", si.id, operation, s)
+		finalEnv := append(os.Environ(), cmdEnv...)
+		environment := map[string]string{}
+		for _, k := range finalEnv {
+			key, value, err := utils.ParseVariable(k)
+			if err != nil {
+				return "", "", err
+			}
+			environment[key] = value
 		}
-		stdOut, err := utils.RunCommand(context, cmd, "", logger, writer, cmdEnv, si.finalArgs, returnResult)
+		finalCmd, err := utils.SubstituteVariable(cmd, environment, si.finalArgs)
+		if err != nil {
+			return "", "", err
+		}
+
+		stdOut := new(strings.Builder)
+
+		err = exechelper.Run(finalCmd,
+			exechelper.WithContext(context),
+			exechelper.WithStderr(&bufferedWriter{buffer: stdOut, original: writer}),
+			exechelper.WithStdout(writer),
+			exechelper.WithEnvirons(finalEnv...),
+			exechelper.WithDir(""))
+
 		if err != nil {
 			_, _ = writer.WriteString(fmt.Sprintf("error running command: %v\n", err))
 			_ = writer.Flush()
 			return fileName, "", err
 		}
 		if returnResult {
-			finalOut += stdOut
+			finalOut += stdOut.String()
 		}
 	}
 	return fileName, finalOut, nil

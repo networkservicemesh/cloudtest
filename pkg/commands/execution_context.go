@@ -32,6 +32,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/edwarnicke/exechelper"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -1820,15 +1821,19 @@ func (ctx *executionContext) handleScript(args *runScriptArgs) error {
 }
 
 func runScript(ctx context.Context, name, script string, env []string, writer *bufio.Writer) error {
-	logger := func(s string) {
-	}
 	root, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 	var errs []string
 	for _, cmd := range utils.ParseScript(script) {
-		_, err := utils.RunCommand(ctx, cmd, root, logger, writer, env, nil, false)
+		err := exechelper.Run(cmd,
+			exechelper.WithContext(ctx),
+			exechelper.WithStderr(writer),
+			exechelper.WithStdout(writer),
+			exechelper.WithEnvirons(append(os.Environ(), env...)...),
+			exechelper.WithDir(root))
+
 		if err != nil {
 			logrus.Errorf("An error during run cmd: %v, err: %v", cmd, err.Error())
 			errs = append(errs, err.Error())

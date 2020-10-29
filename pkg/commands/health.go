@@ -17,11 +17,11 @@
 package commands
 
 import (
-	"bufio"
 	"context"
 	"strings"
 	"time"
 
+	"github.com/edwarnicke/exechelper"
 	"github.com/pkg/errors"
 
 	"github.com/networkservicemesh/cloudtest/pkg/config"
@@ -43,7 +43,11 @@ func RunHealthChecks(checkConfigs []*config.HealthCheckConfig, errCh chan<- erro
 
 				for _, cmd := range utils.ParseScript(config.Run) {
 					builder := &strings.Builder{}
-					_, err := utils.RunCommand(timeoutCtx, cmd, "", func(s string) {}, bufio.NewWriter(builder), nil, nil, false)
+					err := exechelper.Run(cmd,
+						exechelper.WithContext(timeoutCtx),
+						exechelper.WithStderr(builder),
+						exechelper.WithStdout(builder))
+
 					if ready && err != nil {
 						errCh <- errors.Wrapf(errors.Errorf(config.Message), "health check probe failed")
 						return

@@ -25,6 +25,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/edwarnicke/exechelper"
+
 	"github.com/networkservicemesh/cloudtest/pkg/model"
 	"github.com/networkservicemesh/cloudtest/pkg/shell"
 	"github.com/networkservicemesh/cloudtest/pkg/utils"
@@ -51,9 +53,12 @@ func (runner *shellTestRunner) runCmd(context context.Context, script, env []str
 		_, _ = writer.WriteString(fmt.Sprintf(">>>>>>Running: %s:<<<<<<\n", cmd))
 		_ = writer.Flush()
 
-		logger := func(s string) {
-		}
-		_, err := utils.RunCommand(context, cmd, "", logger, writer, cmdEnv, nil, false)
+		err := exechelper.Run(cmd,
+			exechelper.WithContext(context),
+			exechelper.WithStderr(writer),
+			exechelper.WithStdout(writer),
+			exechelper.WithEnvirons(append(os.Environ(), cmdEnv...)...),
+			exechelper.WithDir(runner.test.ExecutionConfig.PackageRoot))
 		if err != nil {
 			_, _ = writer.WriteString(fmt.Sprintf("error running command: %v\n", err))
 			_ = writer.Flush()

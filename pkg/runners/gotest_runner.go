@@ -25,9 +25,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/edwarnicke/exechelper"
+
 	"github.com/networkservicemesh/cloudtest/pkg/model"
 	"github.com/networkservicemesh/cloudtest/pkg/shell"
-	"github.com/networkservicemesh/cloudtest/pkg/utils"
 )
 
 type goTestRunner struct {
@@ -37,11 +38,13 @@ type goTestRunner struct {
 }
 
 func (runner *goTestRunner) Run(timeoutCtx context.Context, env []string, writer *bufio.Writer) error {
-	logger := func(s string) {}
 	cmdEnv := append(runner.envMgr.GetProcessedEnv(), env...)
-	_, err := utils.RunCommand(timeoutCtx, runner.cmdLine, runner.test.ExecutionConfig.PackageRoot,
-		logger, writer, cmdEnv, nil, false)
-	return err
+	return exechelper.Run(runner.cmdLine,
+		exechelper.WithContext(timeoutCtx),
+		exechelper.WithStderr(writer),
+		exechelper.WithStdout(writer),
+		exechelper.WithEnvirons(append(os.Environ(), cmdEnv...)...),
+		exechelper.WithDir(runner.test.ExecutionConfig.PackageRoot))
 }
 
 func (runner *goTestRunner) GetCmdLine() string {
