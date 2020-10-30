@@ -17,10 +17,8 @@
 package packet
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"math/rand"
 	"os"
 	"path"
@@ -49,6 +47,8 @@ const (
 	stopScript      = "stop"    // #6
 	cleanupScript   = "cleanup" // #7
 	packetProjectID = "PACKET_PROJECT_ID"
+	activeState     = "active"
+	failedState     = "failed"
 )
 
 type packetProvider struct {
@@ -292,43 +292,48 @@ func (pi *packetInstance) addDeviceContextArguments() {
 }
 
 func (pi *packetInstance) waitDevicesStartup(context context.Context) error {
-	_, fileID, err := pi.manager.OpenFile(pi.id, "wait-nodes")
+	_, file, err := pi.manager.OpenFile(pi.id, "wait-nodes")
 	if err != nil {
 		return err
 	}
+	defer func() { _ = file.Close() }()
+	log := utils.NewLogger(file)
 
-	writer := bufio.NewWriter(fileID)
-	defer func() { _ = fileID.Close() }()
-	for {
-		alive := map[string]*packngo.Device{}
+	active := map[string]*packngo.Device{}
+	failed := map[string]*packngo.Device{}
+	for len(active)+len(failed) < len(pi.devices) {
 		for key, d := range pi.devices {
 			var updatedDevice *packngo.Device
 			updatedDevice, _, err := pi.client.Devices.Get(d.ID, &packngo.GetOptions{})
 			if err != nil {
 				logrus.Errorf("%v-%v Error accessing device Error: %v", pi.id, d.ID, err)
 				continue
-			} else if updatedDevice.State == "active" {
-				alive[key] = updatedDevice
 			}
-			msg := fmt.Sprintf("Checking status %v %v %v", key, d.ID, updatedDevice.State)
-			_, _ = writer.WriteString(msg)
-			_ = writer.Flush()
+			log.Printf("Checking status %v %v %v\n", key, d.ID, updatedDevice.State)
 			logrus.Infof("%v-Checking status %v", pi.id, updatedDevice.State)
-		}
-		if len(alive) == len(pi.devices) {
-			pi.devices = alive
-			break
+			switch updatedDevice.State {
+			case activeState:
+				active[key] = updatedDevice
+			case failedState:
+				failed[key] = updatedDevice
+			}
 		}
 		select {
 		case <-time.After(10 * time.Second):
 			continue
 		case <-context.Done():
-			_, _ = writer.WriteString(fmt.Sprintf("Timeout"))
+			log.Println("Timeout")
 			return errors.Wrap(context.Err(), "timeout")
 		}
 	}
-	_, _ = writer.WriteString(fmt.Sprintf("All devices online"))
-	_ = writer.Flush()
+
+	if len(failed) > 0 {
+		log.Println("There are failed devices")
+		return errors.Errorf("failed devices: %v", failed)
+	}
+
+	log.Println("All devices online")
+
 	return nil
 }
 
@@ -348,7 +353,7 @@ func (pi *packetInstance) createHardwareDevice(devCfg *config.HardwareDeviceConf
 		msg := fmt.Sprintf("HostName=%v\n%v - %v", devReq.Hostname, response, err)
 		logrus.Infof(fmt.Sprintf("%s-%v", pi.id, msg))
 		pi.manager.AddLog(pi.id, fmt.Sprintf("create-device-%s", devCfg.Name), msg)
-		if err == nil || err != nil &&
+		if err == nil ||
 			!strings.Contains(err.Error(), "is not provisionable") &&
 			!strings.Contains(err.Error(), "Oh snap, something went wrong") {
 			break
@@ -372,7 +377,7 @@ func (pi *packetInstance) createFacilityDevice(devCfg *config.FacilityDeviceConf
 		msg := fmt.Sprintf("HostName=%v\n%v - %v", devReq.Hostname, response, err)
 		logrus.Infof(fmt.Sprintf("%s-%v", pi.id, msg))
 		pi.manager.AddLog(pi.id, fmt.Sprintf("create-device-%s", devCfg.Name), msg)
-		if err == nil || err != nil &&
+		if err == nil ||
 			!strings.Contains(err.Error(), "has no provisionable") &&
 			!strings.Contains(err.Error(), "Oh snap, something went wrong") {
 			break
@@ -408,24 +413,28 @@ func (pi *packetInstance) createRequest(devCfg *config.HardwareDeviceConfig) (*p
 }
 
 func (pi *packetInstance) setupDeviceNetwork(device *packngo.Device, netCfg *config.NetworkConfig) error {
-	piAddLog := func(format string, a ...interface{}) {
-		pi.manager.AddLog(pi.id, "setup-device-network", fmt.Sprintf(format, a...))
+	_, file, err := pi.manager.OpenFile(pi.id, "setup-device-network")
+	if err != nil {
+		return err
 	}
+	defer func() { _ = file.Close() }()
+	log := utils.NewLogger(file)
 
-	var err error
 	defer func() {
 		if err != nil {
-			piAddLog("error: %v", err)
+			log.Printf("error: %v\n", err)
 		}
 	}()
 
-	piAddLog("device to network type: %v -> %v", device.Hostname, netCfg.Type)
+	log.Printf("device to network type: %v -> %v\n", device.Hostname, netCfg.Type)
 	device, err = pi.client.DevicePorts.DeviceToNetworkType(device.ID, string(netCfg.Type))
 	if err != nil {
 		return err
 	}
 
 	for portName, vlanTag := range netCfg.PortVLANs {
+		log.Printf("port to vlan: %v -> %v\n", portName, vlanTag)
+
 		var port *packngo.Port
 		port, err = pi.client.DevicePorts.GetPortByName(device.ID, portName)
 		if err != nil {
@@ -438,12 +447,10 @@ func (pi *packetInstance) setupDeviceNetwork(device *packngo.Device, netCfg *con
 			return err
 		}
 
-		var response *packngo.Response
-		_, response, err = pi.client.DevicePorts.Assign(&packngo.PortAssignRequest{
+		_, _, err = pi.client.DevicePorts.Assign(&packngo.PortAssignRequest{
 			PortID:           port.ID,
 			VirtualNetworkID: vlan.ID,
 		})
-		piAddLog("port to vlan: %v -> %v\n%v", portName, vlanTag, response)
 		if err != nil {
 			return err
 		}
@@ -466,11 +473,8 @@ func (pi *packetInstance) findHardwareReservations() ([]*packngo.HardwareReserva
 		Includes: []string{"facility"},
 	})
 
-	out := strings.Builder{}
-	_, _ = out.WriteString(fmt.Sprintf("%v\n%v\n", response.String(), err))
-
 	if err != nil {
-		pi.manager.AddLog(pi.id, "list-hardware-reservations", out.String())
+		pi.manager.AddLog(pi.id, "list-hardware-reservations", fmt.Sprintf("%v\n%v\n", response.String(), err))
 		return nil, err
 	}
 
@@ -487,13 +491,16 @@ func (pi *packetInstance) findHardwareReservations() ([]*packngo.HardwareReserva
 }
 
 func (pi *packetInstance) findFacilities() ([]string, error) {
-	facilities, response, err := pi.client.Facilities.List(&packngo.ListOptions{})
-
-	out := strings.Builder{}
-	_, _ = out.WriteString(fmt.Sprintf("%v\n%v\n", response.String(), err))
-
+	_, file, err := pi.manager.OpenFile(pi.id, "list-facilities")
 	if err != nil {
-		pi.manager.AddLog(pi.id, "list-facilities", out.String())
+		return nil, err
+	}
+	defer func() { _ = file.Close() }()
+	log := utils.NewLogger(file)
+
+	facilities, response, err := pi.client.Facilities.List(&packngo.ListOptions{})
+	if err != nil {
+		log.Printf("%v\n%v\n", response.String(), err)
 		return nil, err
 	}
 
@@ -518,7 +525,6 @@ func (pi *packetInstance) findFacilities() ([]string, error) {
 
 	// Randomize facilities.
 	ind := -1
-
 	if pi.config.Packet.PreferredFacility != "" {
 		for i, f := range facilitiesList {
 			if f == pi.config.Packet.PreferredFacility {
@@ -527,15 +533,11 @@ func (pi *packetInstance) findFacilities() ([]string, error) {
 			}
 		}
 	}
-
 	if ind != -1 {
 		facilitiesList[ind], facilitiesList[0] = facilitiesList[0], facilitiesList[ind]
 	}
 
-	msg := fmt.Sprintf("List of facilities: %v %v", facilities, response)
-	//logrus.Infof(msg)
-	_, _ = out.WriteString(msg)
-	pi.manager.AddLog(pi.id, "list-facilities", out.String())
+	log.Printf("List of facilities: %v %v\n", facilities, response)
 
 	return facilitiesList, nil
 }
@@ -552,12 +554,14 @@ func (pi *packetInstance) Destroy(timeout time.Duration) error {
 			pi.manager.AddLog(pi.id, "delete-sshkey", fmt.Sprintf("%v\n%v\n%v", pi.sshKey, response, err))
 		}
 
-		_, logFile, err := pi.manager.OpenFile(pi.id, "destroy-cluster")
-		defer func() { _ = logFile.Close() }()
+		_, file, err := pi.manager.OpenFile(pi.id, "destroy-cluster")
 		if err != nil {
 			return err
 		}
-		_, _ = logFile.WriteString(fmt.Sprintf("Starting Delete of cluster %v", pi.id))
+		defer func() { _ = file.Close() }()
+		log := utils.NewLogger(file)
+
+		log.Printf("Starting Delete of cluster %v\n", pi.id)
 		iteration := 0
 		for {
 			alive := map[string]*packngo.Device{}
@@ -568,17 +572,17 @@ func (pi *packetInstance) Destroy(timeout time.Duration) error {
 					if iteration == 0 {
 						msg := fmt.Sprintf("%v-%v Error accessing device Error: %v", pi.id, device.ID, err)
 						logrus.Error(msg)
-						_, _ = logFile.WriteString(msg)
+						log.Println(msg)
 					} // else, if not first iteration and there is no device, just continue.
 					continue
 				}
 				if updatedDevice.State != "provisioning" && updatedDevice.State != "queued" {
 					response, err := pi.client.Devices.Delete(device.ID, true)
 					if err != nil {
-						_, _ = logFile.WriteString(fmt.Sprintf("delete-device-error-%s => %v\n%v ", key, response, err))
+						log.Printf("delete-device-error-%s => %v\n%v\n", key, response, err)
 						logrus.Errorf("%v Failed to delete device %v", pi.id, device.ID)
 					} else {
-						_, _ = logFile.WriteString(fmt.Sprintf("delete-device-success-%s => %v\n%v ", key, response, err))
+						log.Printf("delete-device-success-%s => %v\n%v\n", key, response, err)
 						logrus.Infof("%v Packet delete device send ok %v", pi.id, device.ID)
 					}
 				}
@@ -586,7 +590,7 @@ func (pi *packetInstance) Destroy(timeout time.Duration) error {
 				alive[key] = updatedDevice
 
 				msg := fmt.Sprintf("Device status %v %v %v", key, device.ID, updatedDevice.State)
-				_, _ = logFile.WriteString(msg)
+				log.Println(msg)
 				logrus.Infof("%v-%v", pi.id, msg)
 			}
 			iteration++
@@ -598,12 +602,11 @@ func (pi *packetInstance) Destroy(timeout time.Duration) error {
 				continue
 			case <-ctx.Done():
 				msg := fmt.Sprintf("Timeout for destroying cluster devices %v %v", pi.devices, ctx.Err())
-				_, _ = logFile.WriteString(msg)
+				log.Println(msg)
 				return errors.Errorf("err: %v", msg)
 			}
 		}
-		msg := fmt.Sprintf("Devices destroy complete %v", pi.devices)
-		_, _ = logFile.WriteString(msg)
+		log.Printf("Devices destroy complete %v\n", pi.devices)
 		logrus.Infof("Destroy Complete: %v", pi.id)
 	}
 	return nil
@@ -653,20 +656,25 @@ func (pi *packetInstance) updateProject() error {
 }
 
 func (pi *packetInstance) createKey(keyFile string) ([]string, error) {
+	_, file, err := pi.manager.OpenFile(pi.id, "create-key")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = file.Close() }()
+	log := utils.NewLogger(file)
+
 	today := time.Now()
 	genID := fmt.Sprintf("%d-%d-%d-%s", today.Year(), today.Month(), today.Day(), utils.NewRandomStr(10))
 	pi.keyID = "dev-ci-cloud-" + genID
 
-	out := strings.Builder{}
 	keyFileContent, err := utils.ReadFile(keyFile)
 	if err != nil {
-		_, _ = out.WriteString(fmt.Sprintf("Failed to read key file %s", keyFile))
-		pi.manager.AddLog(pi.id, "create-key", out.String())
+		log.Printf("Failed to read key file %s\n", keyFile)
 		logrus.Errorf("Failed to read file %v %v", keyFile, err)
 		return nil, err
 	}
 
-	_, _ = out.WriteString(fmt.Sprintf("Key file %s readed ok", keyFile))
+	log.Printf("Key file %s readed ok\n", keyFile)
 
 	keyRequest := &packngo.SSHKeyCreateRequest{
 		ProjectID: pi.project.ID,
@@ -679,36 +687,32 @@ func (pi *packetInstance) createKey(keyFile string) ([]string, error) {
 	if response != nil {
 		responseMsg = response.String()
 	}
-	createMsg := fmt.Sprintf("Create key %v %v %v", sshKey, responseMsg, err)
-	_, _ = out.WriteString(createMsg)
+	log.Printf("Create key %v %v %v\n", sshKey, responseMsg, err)
 
 	keyIds := []string{}
 	if sshKey == nil {
 		// try to find key.
-		sshKey, keyIds = pi.findKeys(&out)
+		sshKey, keyIds = pi.findKeys(log)
 	} else {
 		logrus.Infof("%s-Create key %v (%v)", pi.id, sshKey.ID, sshKey.Key)
 		keyIds = append(keyIds, sshKey.ID)
 	}
 	pi.sshKey = sshKey
-	pi.manager.AddLog(pi.id, "create-sshkey", fmt.Sprintf("%v\n%v\n%v\n %s", sshKey, response, err, out.String()))
+	log.Printf("%v\n%v\n%v\n %s\n", sshKey, response, err)
 
 	if sshKey == nil {
-		_, _ = out.WriteString(fmt.Sprintf("Failed to create ssh key %v %v", sshKey, err))
-		pi.manager.AddLog(pi.id, "create-key", out.String())
+		log.Printf("Failed to create ssh key %v %v", sshKey, err)
 		logrus.Errorf("Failed to create ssh key %v", err)
 		return nil, err
 	}
 	return keyIds, nil
 }
 
-func (pi *packetInstance) findKeys(out io.StringWriter) (*packngo.SSHKey, []string) {
+func (pi *packetInstance) findKeys(log logrus.StdLogger) (sshKey *packngo.SSHKey, keyIDs []string) {
 	sshKeys, response, err := pi.client.SSHKeys.List()
 	if err != nil {
-		_, _ = out.WriteString(fmt.Sprintf("List keys error %v %v\n", response, err))
+		log.Printf("List keys error %v %v\n", response, err)
 	}
-	var keyIds []string
-	var sshKey *packngo.SSHKey
 	for k := 0; k < len(sshKeys); k++ {
 		kk := &sshKeys[k]
 		if kk.Label == pi.keyID {
@@ -723,10 +727,10 @@ func (pi *packetInstance) findKeys(out io.StringWriter) (*packngo.SSHKey, []stri
 				Updated:     kk.Updated,
 			}
 		}
-		_, _ = out.WriteString(fmt.Sprintf("Added key key %v\n", kk))
-		keyIds = append(keyIds, kk.ID)
+		log.Printf("Added key key %v\n", kk)
+		keyIDs = append(keyIDs, kk.ID)
 	}
-	return sshKey, keyIds
+	return sshKey, keyIDs
 }
 
 func (p *packetProvider) getProviderID(provider string) string {

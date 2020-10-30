@@ -77,15 +77,13 @@ func (si *shellInterface) RunRead(context context.Context, operation string, scr
 	return response, err
 }
 func (si *shellInterface) runCmd(context context.Context, operation string, script, env []string, returnResult bool) (string, string, error) {
-	fileName, fileRef, err := si.manager.OpenFile(si.id, operation)
+	fileName, file, err := si.manager.OpenFile(si.id, operation)
 	if err != nil {
 		logrus.Errorf("failed to %s system for testing of cluster %s %v", operation, si.config.Name, err)
 		return fileName, "", err
 	}
-
-	defer func() { _ = fileRef.Close() }()
-
-	writer := bufio.NewWriter(fileRef)
+	defer func() { _ = file.Close() }()
+	log := utils.NewLogger(file)
 
 	finalOut := ""
 	for _, cmd := range script {
@@ -94,20 +92,17 @@ func (si *shellInterface) runCmd(context context.Context, operation string, scri
 		}
 
 		cmdEnv := append(si.processedEnv, env...)
-		printableEnv := si.PrintEnv(env)
-
-		_, _ = writer.WriteString(fmt.Sprintf("%s: %v\nENV={\n%v\n}\n", operation, cmd, printableEnv))
-		_ = writer.Flush()
+		log.Printf("%s: %v\nENV={\n%v\n}\n", operation, cmd, si.PrintEnv(env))
 
 		logrus.Infof("%s: %s => %s", operation, si.id, cmd)
 
 		logger := func(s string) {
 			// logrus.Infof("%s: %s -> %v", si.id, operation, s)
 		}
+		writer := bufio.NewWriter(file)
 		stdOut, err := utils.RunCommand(context, cmd, "", logger, writer, cmdEnv, si.finalArgs, returnResult)
 		if err != nil {
-			_, _ = writer.WriteString(fmt.Sprintf("error running command: %v\n", err))
-			_ = writer.Flush()
+			log.Printf("error running command: %v\n", err)
 			return fileName, "", err
 		}
 		if returnResult {

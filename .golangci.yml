@@ -165,3 +165,12 @@ linters:
     # - unused
     - varcheck
     - whitespace
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    - path: pkg/providers/packet/packet_provider.go
+      linters:
+        - interfacer
+      text: "`log` can be `github.com/hashicorp/go-retryablehttp.Logger`"
