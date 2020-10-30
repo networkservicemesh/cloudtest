@@ -17,7 +17,6 @@
 package packet
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -49,6 +48,8 @@ const (
 	stopScript      = "stop"    // #6
 	cleanupScript   = "cleanup" // #7
 	packetProjectID = "PACKET_PROJECT_ID"
+	activeState     = "active"
+	failedState     = "failed"
 )
 
 type packetProvider struct {
@@ -292,43 +293,49 @@ func (pi *packetInstance) addDeviceContextArguments() {
 }
 
 func (pi *packetInstance) waitDevicesStartup(context context.Context) error {
-	_, fileID, err := pi.manager.OpenFile(pi.id, "wait-nodes")
+	_, file, err := pi.manager.OpenFile(pi.id, "wait-nodes")
 	if err != nil {
 		return err
 	}
+	defer func() { _ = file.Close() }()
 
-	writer := bufio.NewWriter(fileID)
-	defer func() { _ = fileID.Close() }()
-	for {
-		alive := map[string]*packngo.Device{}
+	log := utils.NewLogger(file)
+
+	active := map[string]*packngo.Device{}
+	failed := map[string]*packngo.Device{}
+	for len(active)+len(failed) < len(pi.devices) {
 		for key, d := range pi.devices {
 			var updatedDevice *packngo.Device
 			updatedDevice, _, err := pi.client.Devices.Get(d.ID, &packngo.GetOptions{})
 			if err != nil {
 				logrus.Errorf("%v-%v Error accessing device Error: %v", pi.id, d.ID, err)
 				continue
-			} else if updatedDevice.State == "active" {
-				alive[key] = updatedDevice
 			}
-			msg := fmt.Sprintf("Checking status %v %v %v", key, d.ID, updatedDevice.State)
-			_, _ = writer.WriteString(msg)
-			_ = writer.Flush()
+			log.Printf("Checking status %v %v %v\n", key, d.ID, updatedDevice.State)
 			logrus.Infof("%v-Checking status %v", pi.id, updatedDevice.State)
-		}
-		if len(alive) == len(pi.devices) {
-			pi.devices = alive
-			break
+			switch updatedDevice.State {
+			case activeState:
+				active[key] = updatedDevice
+			case failedState:
+				failed[key] = updatedDevice
+			}
 		}
 		select {
 		case <-time.After(10 * time.Second):
 			continue
 		case <-context.Done():
-			_, _ = writer.WriteString(fmt.Sprintf("Timeout"))
+			log.Println("Timeout")
 			return errors.Wrap(context.Err(), "timeout")
 		}
 	}
-	_, _ = writer.WriteString(fmt.Sprintf("All devices online"))
-	_ = writer.Flush()
+
+	if len(failed) > 0 {
+		log.Println("There are failed devices")
+		return errors.Errorf("failed devices: %v", failed)
+	}
+
+	log.Println("All devices online")
+
 	return nil
 }
 
