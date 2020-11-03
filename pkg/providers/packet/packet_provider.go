@@ -14,6 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package packet provides utils for configuring packet cluster
 package packet
 
 import (
@@ -39,16 +40,18 @@ import (
 )
 
 const (
-	installScript   = "install" // #1
-	setupScript     = "setup"   // #2
-	startScript     = "start"   // #3
-	configScript    = "config"  // #4
-	prepareScript   = "prepare" // #5
-	stopScript      = "stop"    // #6
-	cleanupScript   = "cleanup" // #7
-	packetProjectID = "PACKET_PROJECT_ID"
-	activeState     = "active"
-	failedState     = "failed"
+	installScript     = "install" // #1
+	setupScript       = "setup"   // #2
+	startScript       = "start"   // #3
+	configScript      = "config"  // #4
+	prepareScript     = "prepare" // #5
+	stopScript        = "stop"    // #6
+	cleanupScript     = "cleanup" // #7
+	packetProjectID   = "PACKET_PROJECT_ID"
+	queuedState       = "queued"
+	provisioningState = "provisioning"
+	activeState       = "active"
+	failedState       = "failed"
 )
 
 type packetProvider struct {
@@ -80,7 +83,7 @@ type packetInstance struct {
 	provider                 *packetProvider
 	client                   *packngo.Client
 	project                  *packngo.Project
-	devices                  map[string]*packngo.Device
+	devices                  map[string]string
 	sshKey                   *packngo.SSHKey
 	params                   providers.InstanceOptions
 	started                  bool
@@ -170,7 +173,7 @@ func (pi *packetInstance) Start(timeout time.Duration) (string, error) {
 	}
 
 	var virtualNetworks *packngo.VirtualNetworkListResponse
-	virtualNetworks, _, err = pi.client.ProjectVirtualNetworks.List(pi.projectID, &packngo.ListOptions{})
+	virtualNetworks, _, err = pi.client.ProjectVirtualNetworks.List(pi.projectID, nil)
 	if err != nil {
 		return "", err
 	}
@@ -182,12 +185,11 @@ func (pi *packetInstance) Start(timeout time.Duration) (string, error) {
 		return "", err
 	}
 	for _, devCfg := range pi.config.Packet.HardwareDevices {
-		var device *packngo.Device
-		device, err = pi.createHardwareDevice(devCfg)
+		devID, err := pi.createHardwareDevice(devCfg)
 		if err != nil {
 			return "", err
 		}
-		pi.devices[devCfg.Name] = device
+		pi.devices[devCfg.Name] = devID
 
 		if devCfg.Network != nil {
 			netCfgs[devCfg.Name] = devCfg.Network
@@ -198,12 +200,11 @@ func (pi *packetInstance) Start(timeout time.Duration) (string, error) {
 		return "", err
 	}
 	for _, devCfg := range pi.config.Packet.Devices {
-		var device *packngo.Device
-		device, err = pi.createFacilityDevice(devCfg)
+		devID, err := pi.createFacilityDevice(devCfg)
 		if err != nil {
 			return "", err
 		}
-		pi.devices[devCfg.Name] = device
+		pi.devices[devCfg.Name] = devID
 
 		if devCfg.Network != nil {
 			netCfgs[devCfg.Name] = devCfg.Network
@@ -216,18 +217,20 @@ func (pi *packetInstance) Start(timeout time.Duration) (string, error) {
 	}
 
 	// Setup network
-	for name, netCfg := range netCfgs {
-		err = pi.setupDeviceNetwork(pi.devices[name], netCfg)
+	for key, netCfg := range netCfgs {
+		err = pi.setupDeviceNetwork(key, netCfg)
 		if err != nil {
 			return "", err
 		}
 	}
 
 	// We need to add arguments
-	pi.addDeviceContextArguments()
+	if err = pi.addDeviceContextArguments(); err != nil {
+		return "", err
+	}
 
-	printableEnv := pi.shellInterface.PrintEnv(pi.shellInterface.GetProcessedEnv())
-	pi.manager.AddLog(pi.id, "environment", printableEnv)
+	pi.manager.AddLog(pi.id, "environment", pi.shellInterface.PrintEnv(pi.shellInterface.GetProcessedEnv()))
+	pi.manager.AddLog(pi.id, "arguments", pi.shellInterface.PrintArgs())
 
 	// Run start script
 	if fileName, err = pi.shellInterface.RunCmd(ctx, "start", pi.startScript, nil); err != nil {
@@ -277,8 +280,12 @@ func (pi *packetInstance) updateKUBEConfig(context context.Context) error {
 	return nil
 }
 
-func (pi *packetInstance) addDeviceContextArguments() {
-	for key, dev := range pi.devices {
+func (pi *packetInstance) addDeviceContextArguments() error {
+	for key, devID := range pi.devices {
+		dev, _, err := pi.client.Devices.Get(devID, getOptions("ip_addresses"))
+		if err != nil {
+			return errors.Wrapf(err, "failed to fetch device networks info: %v", key)
+		}
 		for _, n := range dev.Network {
 			pub := "pub"
 			if !n.Public {
@@ -289,6 +296,7 @@ func (pi *packetInstance) addDeviceContextArguments() {
 			pi.shellInterface.AddExtraArgs(fmt.Sprintf("device.%v.%v.%v.%v", key, pub, "net", n.AddressFamily), n.Network)
 		}
 	}
+	return nil
 }
 
 func (pi *packetInstance) waitDevicesStartup(context context.Context) error {
@@ -302,20 +310,20 @@ func (pi *packetInstance) waitDevicesStartup(context context.Context) error {
 	active := map[string]*packngo.Device{}
 	failed := map[string]*packngo.Device{}
 	for len(active)+len(failed) < len(pi.devices) {
-		for key, d := range pi.devices {
-			var updatedDevice *packngo.Device
-			updatedDevice, _, err := pi.client.Devices.Get(d.ID, &packngo.GetOptions{})
+		for key, devID := range pi.devices {
+			var device *packngo.Device
+			device, _, err := pi.client.Devices.Get(devID, nil)
 			if err != nil {
-				logrus.Errorf("%v-%v Error accessing device Error: %v", pi.id, d.ID, err)
+				logrus.Errorf("%v-%v Error accessing device Error: %v", pi.id, devID, err)
 				continue
 			}
-			log.Printf("Checking status %v %v %v\n", key, d.ID, updatedDevice.State)
-			logrus.Infof("%v-Checking status %v", pi.id, updatedDevice.State)
-			switch updatedDevice.State {
+			log.Printf("Checking status %v %v %v\n", key, devID, device.State)
+			logrus.Infof("%v-Checking status %v", pi.id, device.State)
+			switch device.State {
 			case activeState:
-				active[key] = updatedDevice
+				active[key] = device
 			case failedState:
-				failed[key] = updatedDevice
+				failed[key] = device
 			}
 		}
 		select {
@@ -337,53 +345,63 @@ func (pi *packetInstance) waitDevicesStartup(context context.Context) error {
 	return nil
 }
 
-func (pi *packetInstance) createHardwareDevice(devCfg *config.HardwareDeviceConfig) (device *packngo.Device, err error) {
-	var devReq *packngo.DeviceCreateRequest
-	devReq, err = pi.createRequest(devCfg)
+func (pi *packetInstance) createHardwareDevice(devCfg *config.HardwareDeviceConfig) (string, error) {
+	devReq, err := pi.createRequest(devCfg)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	var response *packngo.Response
 	for _, hr := range pi.hardwareReservationsList {
 		devReq.Plan = hr.Plan.Slug
 		devReq.Facility = []string{hr.Facility.Code}
 		devReq.HardwareReservationID = hr.ID
-		device, response, err = pi.client.Devices.Create(devReq)
-		msg := fmt.Sprintf("HostName=%v\n%v - %v", devReq.Hostname, response, err)
+
+		device, _, err := pi.client.Devices.Create(devReq)
+
+		msg := fmt.Sprintf("HostName=%v\n%v", devReq.Hostname, err)
 		logrus.Infof(fmt.Sprintf("%s-%v", pi.id, msg))
 		pi.manager.AddLog(pi.id, fmt.Sprintf("create-device-%s", devCfg.Name), msg)
-		if err == nil ||
-			!strings.Contains(err.Error(), "is not provisionable") &&
-			!strings.Contains(err.Error(), "Oh snap, something went wrong") {
-			break
+
+		switch {
+		case err == nil:
+			return device.ID, nil
+		case strings.Contains(err.Error(), "is not provisionable"):
+		case strings.Contains(err.Error(), "Oh snap, something went wrong"):
+		default:
+			return "", err
 		}
 	}
-	return device, err
+
+	return "", errors.New("empty hardware reservations list")
 }
 
-func (pi *packetInstance) createFacilityDevice(devCfg *config.FacilityDeviceConfig) (device *packngo.Device, err error) {
-	var devReq *packngo.DeviceCreateRequest
-	devReq, err = pi.createRequest(&devCfg.HardwareDeviceConfig)
+func (pi *packetInstance) createFacilityDevice(devCfg *config.FacilityDeviceConfig) (string, error) {
+	devReq, err := pi.createRequest(&devCfg.HardwareDeviceConfig)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	devReq.Plan = devCfg.Plan
 
-	var response *packngo.Response
 	for i := range pi.facilitiesList {
 		devReq.Facility = []string{pi.facilitiesList[i]}
-		device, response, err = pi.client.Devices.Create(devReq)
-		msg := fmt.Sprintf("HostName=%v\n%v - %v", devReq.Hostname, response, err)
+
+		device, _, err := pi.client.Devices.Create(devReq)
+
+		msg := fmt.Sprintf("HostName=%v\n%v", devReq.Hostname, err)
 		logrus.Infof(fmt.Sprintf("%s-%v", pi.id, msg))
 		pi.manager.AddLog(pi.id, fmt.Sprintf("create-device-%s", devCfg.Name), msg)
-		if err == nil ||
-			!strings.Contains(err.Error(), "has no provisionable") &&
-			!strings.Contains(err.Error(), "Oh snap, something went wrong") {
-			break
+
+		switch {
+		case err == nil:
+			return device.ID, nil
+		case strings.Contains(err.Error(), "has no provisionable"):
+		case strings.Contains(err.Error(), "Oh snap, something went wrong"):
+		default:
+			return "", err
 		}
 	}
-	return device, err
+
+	return "", errors.New("empty facilities list")
 }
 
 func (pi *packetInstance) createRequest(devCfg *config.HardwareDeviceConfig) (*packngo.DeviceCreateRequest, error) {
@@ -412,7 +430,7 @@ func (pi *packetInstance) createRequest(devCfg *config.HardwareDeviceConfig) (*p
 	}, err
 }
 
-func (pi *packetInstance) setupDeviceNetwork(device *packngo.Device, netCfg *config.NetworkConfig) error {
+func (pi *packetInstance) setupDeviceNetwork(key string, netCfg *config.NetworkConfig) error {
 	_, file, err := pi.manager.OpenFile(pi.id, "setup-device-network")
 	if err != nil {
 		return err
@@ -426,8 +444,8 @@ func (pi *packetInstance) setupDeviceNetwork(device *packngo.Device, netCfg *con
 		}
 	}()
 
-	log.Printf("device to network type: %v -> %v\n", device.Hostname, netCfg.Type)
-	device, err = pi.client.DevicePorts.DeviceToNetworkType(device.ID, string(netCfg.Type))
+	log.Printf("device to network type: %v -> %v\n", key, netCfg.Type)
+	device, err := pi.client.DevicePorts.DeviceToNetworkType(pi.devices[key], string(netCfg.Type))
 	if err != nil {
 		return err
 	}
@@ -469,9 +487,7 @@ func (pi *packetInstance) findVlan(vlanTag int) (*packngo.VirtualNetwork, error)
 }
 
 func (pi *packetInstance) findHardwareReservations() ([]*packngo.HardwareReservation, error) {
-	hardwareReservations, response, err := pi.client.HardwareReservations.List(pi.projectID, &packngo.ListOptions{
-		Includes: []string{"facility"},
-	})
+	hardwareReservations, response, err := pi.client.HardwareReservations.List(pi.projectID, listOptions("facility"))
 
 	if err != nil {
 		pi.manager.AddLog(pi.id, "list-hardware-reservations", fmt.Sprintf("%v\n%v\n", response.String(), err))
@@ -565,31 +581,30 @@ func (pi *packetInstance) Destroy(timeout time.Duration) error {
 		iteration := 0
 		for {
 			alive := map[string]*packngo.Device{}
-			for key, device := range pi.devices {
-				var updatedDevice *packngo.Device
-				updatedDevice, _, err := pi.client.Devices.Get(device.ID, &packngo.GetOptions{})
+			for key, devID := range pi.devices {
+				device, _, err := pi.client.Devices.Get(devID, nil)
 				if err != nil {
 					if iteration == 0 {
-						msg := fmt.Sprintf("%v-%v Error accessing device Error: %v", pi.id, device.ID, err)
+						msg := fmt.Sprintf("%v-%v Error accessing device Error: %v", pi.id, devID, err)
 						logrus.Error(msg)
 						log.Println(msg)
 					} // else, if not first iteration and there is no device, just continue.
 					continue
 				}
-				if updatedDevice.State != "provisioning" && updatedDevice.State != "queued" {
-					response, err := pi.client.Devices.Delete(device.ID, true)
+				if device.State != provisioningState && device.State != queuedState {
+					response, err := pi.client.Devices.Delete(devID, true)
 					if err != nil {
 						log.Printf("delete-device-error-%s => %v\n%v\n", key, response, err)
-						logrus.Errorf("%v Failed to delete device %v", pi.id, device.ID)
+						logrus.Errorf("%v Failed to delete device %v", pi.id, devID)
 					} else {
 						log.Printf("delete-device-success-%s => %v\n%v\n", key, response, err)
-						logrus.Infof("%v Packet delete device send ok %v", pi.id, device.ID)
+						logrus.Infof("%v Packet delete device send ok %v", pi.id, devID)
 					}
 				}
 				// Put as alive or some different state
-				alive[key] = updatedDevice
+				alive[key] = device
 
-				msg := fmt.Sprintf("Device status %v %v %v", key, device.ID, updatedDevice.State)
+				msg := fmt.Sprintf("Device status %v %v %v", key, devID, device.State)
 				log.Println(msg)
 				logrus.Infof("%v-%v", pi.id, msg)
 			}
@@ -774,7 +789,7 @@ func (p *packetProvider) CreateCluster(config *config.ClusterProviderConfig, fac
 		params:         instanceOptions,
 		projectID:      os.Getenv(packetProjectID),
 		packetAuthKey:  os.Getenv("PACKET_AUTH_TOKEN"),
-		devices:        map[string]*packngo.Device{},
+		devices:        map[string]string{},
 	}
 
 	return clusterInstance, nil
