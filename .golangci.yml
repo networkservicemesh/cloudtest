@@ -174,3 +174,12 @@ issues:
       linters:
         - interfacer
       text: "`log` can be `github.com/hashicorp/go-retryablehttp.Logger`"
+    - path: ./
+      linters:
+        - gocritic
+      text: "sloppyReassign: re-assignment to `err` can be replaced with `err :="
+    - path: ./
+      linters:
+        - gocritic
+        - govet
+      text: "shadow: declaration of \"err\" shadows declaration"
