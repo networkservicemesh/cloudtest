@@ -20,13 +20,19 @@ import (
 	"github.com/networkservicemesh/cloudtest/pkg/suites/samples/dependencies/nested"
 )
 
+// ParentSuite comment
 type ParentSuite struct {
 	nested.GrandParentSuite
 }
 
+// Test2 comment
 func (s *ParentSuite) Test2() {
 }
+
+// Test3 comment
 func (s *ParentSuite) Test3() {
 }
+
+// Test4 comment
 func (s *ParentSuite) Test4() {
 }

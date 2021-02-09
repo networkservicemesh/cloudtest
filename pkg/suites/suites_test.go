@@ -18,6 +18,7 @@ package suites_test
 
 import (
 	"io/ioutil"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -46,6 +47,7 @@ func TestFind(t *testing.T) {
 
 	foundSuitesMap := make(map[string][]string)
 	for _, suite := range foundSuites {
+		sort.Strings(suite.Tests)
 		foundSuitesMap[suite.Name] = suite.Tests
 	}
 

@@ -14,17 +14,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package nested comment
 package nested
 
 import "github.com/stretchr/testify/suite"
 
+// GrandParentSuite comment
 type GrandParentSuite struct {
 	suite.Suite
 }
 
+// Test3 comment
 func (s *GrandParentSuite) Test3() {
 }
+
+// Test4 comment
 func (s *GrandParentSuite) Test4() {
 }
+
+// Test5 comment
 func (s *GrandParentSuite) Test5() {
 }

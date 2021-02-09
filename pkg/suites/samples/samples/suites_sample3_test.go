@@ -41,4 +41,3 @@ func TestLibEntryPoint3(t *testing.T) {
 func TestLibEntryPoint4(t *testing.T) {
 	suite.Run(t, &dependencies.LibSuite{})
 }
-

@@ -16,11 +16,13 @@
 
 package lookup
 
+// Suite is a go test suite with parent Suite and tests names
 type Suite struct {
 	parent *Suite
 	tests  []string
 }
 
+// GetTests returns set of the Suite and its parent Suite tests names
 func (s *Suite) GetTests() (tests []string) {
 	dupls := make(map[string]struct{})
 	for _, test := range s.tests {

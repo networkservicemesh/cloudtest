@@ -14,15 +14,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package dependencies comment
 package dependencies
 
+// LibSuite comment
 type LibSuite struct {
 	ParentSuite
 }
 
+// Test1 comment
 func (s *LibSuite) Test1() {
 }
+
+// Test2 comment
 func (s *LibSuite) Test2() {
 }
+
+// Test3 comment
 func (s *LibSuite) Test3() {
 }

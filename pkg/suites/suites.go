@@ -1,4 +1,4 @@
-// Copyright (c) 2020 Doc.ai and/or its affiliates.
+// Copyright (c) 2020-2021 Doc.ai and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -60,7 +60,8 @@ func Find(root string) (suites []*model.Suite, err error) {
 
 		for _, pkgNode := range pkgNodes {
 			pkg := lookup.NewPackage(pkgNode, resolvedImports)
-			for _, file := range pkg.Files {
+			for i := range pkg.Files {
+				file := pkg.Files[i]
 				forEachTest(file, func(funcDecl *ast.FuncDecl) {
 					var suite *lookup.Suite
 					pkgName, suiteName := findSuiteNameInBody(funcDecl.Body)
@@ -85,32 +86,35 @@ func Find(root string) (suites []*model.Suite, err error) {
 
 func forEachTest(file *lookup.File, applier func(funcDecl *ast.FuncDecl)) {
 	for _, decl := range file.Decls {
-		if funcDecl, ok := decl.(*ast.FuncDecl); ok {
-			// func Test...(... *testing.T) {...}
-			if !strings.HasPrefix(funcDecl.Name.Name, "Test") {
-				continue
-			}
-			params := funcDecl.Type.Params.List
-			if len(params) != 1 {
-				continue
-			}
-			ptrTestingT, ok := params[0].Type.(*ast.StarExpr)
-			if !ok {
-				continue
-			}
-			testingT, ok := ptrTestingT.X.(*ast.SelectorExpr)
-			if !ok {
-				continue
-			}
-			testing, ok := testingT.X.(*ast.Ident)
-			if !ok {
-				continue
-			}
-			if testing.Name != "testing" || testingT.Sel.Name != "T" {
-				continue
-			}
-			applier(funcDecl)
+		funcDecl, ok := decl.(*ast.FuncDecl)
+		if !ok {
+			continue
 		}
+
+		// func Test...(... *testing.T) {...}
+		if !strings.HasPrefix(funcDecl.Name.Name, "Test") {
+			continue
+		}
+		params := funcDecl.Type.Params.List
+		if len(params) != 1 {
+			continue
+		}
+		ptrTestingT, ok := params[0].Type.(*ast.StarExpr)
+		if !ok {
+			continue
+		}
+		testingT, ok := ptrTestingT.X.(*ast.SelectorExpr)
+		if !ok {
+			continue
+		}
+		testing, ok := testingT.X.(*ast.Ident)
+		if !ok {
+			continue
+		}
+		if testing.Name != "testing" || testingT.Sel.Name != "T" {
+			continue
+		}
+		applier(funcDecl)
 	}
 }
 
@@ -140,9 +144,6 @@ func findSuiteNameInBody(body *ast.BlockStmt) (pkgName, name string) {
 }
 
 func findExpressionName(exp ast.Expr) (pkgName, name string) {
-	if exp == nil {
-		return "", ""
-	}
 	switch v := exp.(type) {
 	case *ast.CallExpr:
 		if _, funName := findExpressionName(v.Fun); funName == "new" {

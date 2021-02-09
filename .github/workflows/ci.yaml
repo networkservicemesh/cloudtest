@@ -79,13 +79,13 @@ jobs:
     name: golangci-lint
     runs-on: ubuntu-latest
     env:
-      GOLANGCI_LINT_CONTAINER: golangci/golangci-lint:v1.28.1
+      GOLANGCI_LINT_CONTAINER: golangci/golangci-lint:v1.35.0
     steps:
       - uses: actions/checkout@v2
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v1
+        uses: golangci/golangci-lint-action@v2
         with:
-          version: v1.29
+          version: v1.35.0
           only-new-issues: true
 
   excludeFmtErrorf:
