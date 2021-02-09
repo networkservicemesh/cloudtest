@@ -17,26 +17,37 @@
 package suites_test
 
 import (
-	"fmt"
-	"sort"
-	"strings"
+	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 
 	"github.com/networkservicemesh/cloudtest/pkg/suites"
 )
 
+func testResults() map[string][]string {
+	bytes, err := ioutil.ReadFile("./samples/test_result.yaml")
+	if err != nil {
+		return nil
+	}
+
+	results := make(map[string][]string)
+	if err := yaml.Unmarshal(bytes, &results); err != nil {
+		return nil
+	}
+
+	return results
+}
+
 func TestFind(t *testing.T) {
 	foundSuites, err := suites.Find("./samples")
 	require.NoError(t, err)
-	require.NotNil(t, foundSuites)
-	require.Len(t, foundSuites, 6)
-	sort.Slice(foundSuites, func(i, j int) bool {
-		return strings.Compare(foundSuites[i].Name, foundSuites[j].Name) == -1
-	})
-	for i, s := range foundSuites {
-		require.Equal(t, s.Name, fmt.Sprintf("TestEntryPoint%v", i+1))
+
+	foundSuitesMap := make(map[string][]string)
+	for _, suite := range foundSuites {
+		foundSuitesMap[suite.Name] = suite.Tests
 	}
-	require.Len(t, foundSuites[5].Tests, 4)
+
+	require.Equal(t, testResults(), foundSuitesMap)
 }
