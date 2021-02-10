@@ -62,13 +62,13 @@ func Find(root string) (suites []*model.Suite, err error) {
 			pkg := lookup.NewPackage(pkgNode, resolvedImports)
 			for i := range pkg.Files {
 				file := pkg.Files[i]
-				forEachTest(file, func(funcDecl *ast.FuncDecl) {
+				if err = forEachTest(file, func(funcDecl *ast.FuncDecl) (err error) {
 					var suite *lookup.Suite
 					pkgName, suiteName := findSuiteNameInBody(funcDecl.Body)
 					if pkgName != "" {
-						suite = file.Lookup(pkgName, suiteName)
+						suite, err = file.Lookup(pkgName, suiteName)
 					} else if suiteName != "" {
-						suite = pkg.Lookup(suiteName)
+						suite, err = pkg.Lookup(suiteName)
 					}
 					if suite != nil {
 						suites = append(suites, &model.Suite{
@@ -76,7 +76,10 @@ func Find(root string) (suites []*model.Suite, err error) {
 							Tests: suite.GetTests(),
 						})
 					}
-				})
+					return err
+				}); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -84,7 +87,7 @@ func Find(root string) (suites []*model.Suite, err error) {
 	return suites, nil
 }
 
-func forEachTest(file *lookup.File, applier func(funcDecl *ast.FuncDecl)) {
+func forEachTest(file *lookup.File, applier func(funcDecl *ast.FuncDecl) error) error {
 	for _, decl := range file.Decls {
 		funcDecl, ok := decl.(*ast.FuncDecl)
 		if !ok {
@@ -114,8 +117,12 @@ func forEachTest(file *lookup.File, applier func(funcDecl *ast.FuncDecl)) {
 		if testing.Name != "testing" || testingT.Sel.Name != "T" {
 			continue
 		}
-		applier(funcDecl)
+
+		if err := applier(funcDecl); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func findSuiteNameInBody(body *ast.BlockStmt) (pkgName, name string) {

@@ -24,6 +24,8 @@ import (
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/pkg/errors"
 )
 
 // Package is an *ast.Package with suites lookup
@@ -33,6 +35,7 @@ type Package struct {
 	importPath      string
 	Files           []*File
 	once            *sync.Once
+	resolveErr      error
 }
 
 // NewPackage creates a new Package from *ast.Package
@@ -58,20 +61,20 @@ func newImport(importPath string, resolvedImports map[string]*Package) *Package 
 	}
 }
 
-func (p *Package) resolve() {
+func (p *Package) resolve() error {
 	pkg, err := build.Default.Import(p.importPath, ".", build.FindOnly)
 	if err != nil {
-		panic(err.Error())
+		return err
 	}
 
 	pkgNodes, err := parser.ParseDir(token.NewFileSet(), pkg.Dir, func(fileInfo os.FileInfo) bool {
 		return !strings.HasSuffix(fileInfo.Name(), "_test.go")
 	}, 0)
 	if err != nil {
-		panic(err.Error())
+		return err
 	}
 	if len(pkgNodes) != 1 {
-		panic("too much packages")
+		return errors.Errorf("found more than 1 package in directory: %s", p.importPath)
 	}
 
 	for _, pkgNode := range pkgNodes {
@@ -79,37 +82,45 @@ func (p *Package) resolve() {
 			p.Files = append(p.Files, newFile(f, p.resolvedImports, p.suites, p))
 		}
 	}
+
+	return nil
 }
 
 // Lookup looks up for a `name` suite
-func (p *Package) Lookup(name string) *Suite {
-	suite, ok := p.suites[name]
-	if ok {
-		return suite
+func (p *Package) Lookup(name string) (suite *Suite, err error) {
+	if p.once != nil {
+		p.once.Do(func() {
+			p.resolveErr = p.resolve()
+		})
+	}
+	if p.resolveErr != nil {
+		return nil, p.resolveErr
 	}
 
-	if p.once != nil {
-		p.once.Do(p.resolve)
+	var ok bool
+	suite, ok = p.suites[name]
+	if ok {
+		return suite, nil
 	}
 
 	suite = new(Suite)
-	if suite.parent = p.findSuiteParent(name); suite.parent == nil {
-		return nil
+	if suite.parent, err = p.findSuiteParent(name); suite.parent == nil || err != nil {
+		return nil, err
 	}
 	suite.tests = p.findSuiteTests(name)
 
 	p.suites[name] = suite
 
-	return suite
+	return suite, nil
 }
 
-func (p *Package) findSuiteParent(name string) (parentSuite *Suite) {
-	for _, file := range p.Files {
-		if parentSuite = file.findSuiteParent(name); parentSuite != nil {
-			break
+func (p *Package) findSuiteParent(name string) (parentSuite *Suite, err error) {
+	for i := 0; parentSuite == nil && i < len(p.Files); i++ {
+		if parentSuite, err = p.Files[i].findSuiteParent(name); err != nil {
+			return nil, err
 		}
 	}
-	return parentSuite
+	return parentSuite, nil
 }
 
 func (p *Package) findSuiteTests(name string) (tests []string) {

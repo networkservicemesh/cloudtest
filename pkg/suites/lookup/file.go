@@ -21,6 +21,8 @@ import (
 	"go/token"
 	"path"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // File is an *ast.File with suites lookup
@@ -70,50 +72,52 @@ func (f *File) findImports() {
 }
 
 // Lookup looks up for a `pkgName.name` suite
-func (f *File) Lookup(pkgName, name string) *Suite {
+func (f *File) Lookup(pkgName, name string) (*Suite, error) {
 	pkg, ok := f.imports[pkgName]
 	if !ok {
-		return nil
+		return nil, errors.Errorf("invalid import: %s", pkgName)
 	}
 	return pkg.Lookup(name)
 }
 
-func (f *File) findSuiteParent(name string) (parentSuite *Suite) {
+func (f *File) findSuiteParent(name string) (parentSuite *Suite, err error) {
 	for _, decl := range f.Decls {
 		if genDecl, ok := decl.(*ast.GenDecl); ok && genDecl.Tok == token.TYPE {
 			for _, spec := range genDecl.Specs {
-				typeSpec := spec.(*ast.TypeSpec)
+				typeSpec := spec.(*ast.TypeSpec) // it should be `*ast.TypeSpec` because of `token.TYPE`
 				if typeSpec.Name.Name != name {
 					continue
 				}
 
 				if structType, ok := typeSpec.Type.(*ast.StructType); ok {
-					for _, field := range structType.Fields.List {
-						if field.Names == nil {
-							if parentSuite = f.getSuite(field.Type); parentSuite != nil {
-								break
+					for i := 0; parentSuite == nil && i < len(structType.Fields.List); i++ {
+						if field := structType.Fields.List[i]; field.Names == nil {
+							if parentSuite, err = f.getSuite(field.Type); err != nil {
+								return nil, err
 							}
 						}
 					}
 				}
 
-				return parentSuite
+				return parentSuite, nil
 			}
 		}
 	}
-	return nil
+	return nil, nil
 }
 
-func (f *File) getSuite(expr ast.Expr) *Suite {
+func (f *File) getSuite(expr ast.Expr) (*Suite, error) {
 	switch v := expr.(type) {
 	case *ast.Ident:
 		return f.pkg.Lookup(v.Name)
 	case *ast.StarExpr:
 		return f.getSuite(v.X)
 	case *ast.SelectorExpr:
-		return f.imports[v.X.(*ast.Ident).Name].Lookup(v.Sel.Name)
+		if x, ok := v.X.(*ast.Ident); ok {
+			return f.imports[x.Name].Lookup(v.Sel.Name)
+		}
 	}
-	return nil
+	return nil, nil
 }
 
 func (f *File) findSuiteTests(name string) (tests []string) {
