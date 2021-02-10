@@ -1,4 +1,4 @@
-// Copyright (c) 2020 Doc.ai and/or its affiliates.
+// Copyright (c) 2020-2021 Doc.ai and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -20,27 +20,25 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/networkservicemesh/cloudtest/pkg/model"
+	"github.com/networkservicemesh/cloudtest/pkg/suites/lookup"
 )
 
 const noneParseFlag = 0
 
-func Find(root string) ([]*model.Suite, error) {
+// Find finds go test suites recursively in root
+func Find(root string) (suites []*model.Suite, err error) {
 	var testPaths []string
-	var suiteTests = make(map[string][]string)
-	var suiteEntryPoints = make(map[string][]string)
-
-	if err := filepath.Walk(root,
+	if err = filepath.Walk(root,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
-			if !info.IsDir() && strings.HasSuffix(path, "_test.go") {
+			if info.IsDir() {
 				testPaths = append(testPaths, path)
 			}
 			return nil
@@ -50,66 +48,84 @@ func Find(root string) ([]*model.Suite, error) {
 	}
 
 	fileSet := token.NewFileSet()
+	resolvedImports := lookup.ResolvedImports()
 
 	for _, p := range testPaths {
-		b, err := ioutil.ReadFile(p)
+		pkgNodes, err := parser.ParseDir(fileSet, p, func(info os.FileInfo) bool {
+			return strings.HasSuffix(info.Name(), "_test.go")
+		}, noneParseFlag)
 		if err != nil {
 			return nil, err
 		}
-		f, err := parser.ParseFile(fileSet, p, string(b), noneParseFlag)
-		if err != nil {
-			return nil, err
-		}
-		forEachTest(f, func(x *ast.FuncDecl) {
-			if x.Recv != nil && len(x.Type.Params.List) == 0 {
-				if v, ok := x.Recv.List[0].Type.(*ast.StarExpr); ok {
-					suiteTests[v.X.(*ast.Ident).Name] = append(suiteTests[v.X.(*ast.Ident).Name], x.Name.Name)
-				}
-			}
-			if len(x.Type.Params.List) == 1 {
-				if v, ok := x.Type.Params.List[0].Type.(*ast.StarExpr); ok {
-					if v.X.(*ast.SelectorExpr).X.(*ast.Ident).Name == "testing" {
-						if suiteName, ok := findSuiteNameInBody(x.Body); ok {
-							suiteEntryPoints[suiteName] = append(suiteEntryPoints[suiteName], x.Name.Name)
-						}
+
+		for _, pkgNode := range pkgNodes {
+			pkg := lookup.NewPackage(pkgNode, resolvedImports)
+			for i := range pkg.Files {
+				file := pkg.Files[i]
+				if err = forEachTest(file, func(funcDecl *ast.FuncDecl) (err error) {
+					var suite *lookup.Suite
+					pkgName, suiteName := findSuiteNameInBody(funcDecl.Body)
+					if pkgName != "" {
+						suite, err = file.Lookup(pkgName, suiteName)
+					} else if suiteName != "" {
+						suite, err = pkg.Lookup(suiteName)
 					}
+					if suite != nil {
+						suites = append(suites, &model.Suite{
+							Name:  funcDecl.Name.Name,
+							Tests: suite.GetTests(),
+						})
+					}
+					return err
+				}); err != nil {
+					return nil, err
 				}
 			}
-		})
+		}
 	}
 
-	return buildSuites(suiteTests, suiteEntryPoints), nil
+	return suites, nil
 }
 
-func buildSuites(suiteTests, suiteEntryPoints map[string][]string) []*model.Suite {
-	var result []*model.Suite
-	for k, v := range suiteTests {
-		rootTests := suiteEntryPoints[k]
-		if len(rootTests) == 0 {
+func forEachTest(file *lookup.File, applier func(funcDecl *ast.FuncDecl) error) error {
+	for _, decl := range file.Decls {
+		funcDecl, ok := decl.(*ast.FuncDecl)
+		if !ok {
 			continue
 		}
-		for _, name := range rootTests {
-			result = append(result, &model.Suite{
-				Name:  name,
-				Tests: append([]string{}, v...),
-			})
+
+		// func Test...(... *testing.T) {...}
+		if !strings.HasPrefix(funcDecl.Name.Name, "Test") {
+			continue
+		}
+		params := funcDecl.Type.Params.List
+		if len(params) != 1 {
+			continue
+		}
+		ptrTestingT, ok := params[0].Type.(*ast.StarExpr)
+		if !ok {
+			continue
+		}
+		testingT, ok := ptrTestingT.X.(*ast.SelectorExpr)
+		if !ok {
+			continue
+		}
+		testing, ok := testingT.X.(*ast.Ident)
+		if !ok {
+			continue
+		}
+		if testing.Name != "testing" || testingT.Sel.Name != "T" {
+			continue
+		}
+
+		if err := applier(funcDecl); err != nil {
+			return err
 		}
 	}
-	return result
+	return nil
 }
 
-func forEachTest(node ast.Node, applier func(decl *ast.FuncDecl)) {
-	ast.Inspect(node, func(n ast.Node) bool {
-		if decl, ok := n.(*ast.FuncDecl); ok {
-			if strings.HasPrefix(decl.Name.Name, "Test") {
-				applier(decl)
-			}
-		}
-		return true
-	})
-}
-
-func findSuiteNameInBody(body *ast.BlockStmt) (string, bool) {
+func findSuiteNameInBody(body *ast.BlockStmt) (pkgName, name string) {
 	for _, l := range body.List {
 		var expr *ast.ExprStmt
 		var ok bool
@@ -128,47 +144,47 @@ func findSuiteNameInBody(body *ast.BlockStmt) (string, bool) {
 			continue
 		}
 		if selector.X.(*ast.Ident).Name == "suite" && selector.Sel.Name == "Run" {
-			if name := findExpressionName(call.Args[1]); name != "" {
-				return name, true
-			}
+			return findExpressionName(call.Args[1])
 		}
 	}
-	return "", false
+	return "", ""
 }
-func findExpressionName(exp ast.Expr) string {
-	if exp == nil {
-		return ""
-	}
+
+func findExpressionName(exp ast.Expr) (pkgName, name string) {
 	switch v := exp.(type) {
 	case *ast.CallExpr:
-		if funName := findExpressionName(v.Fun); funName == "new" {
+		if _, funName := findExpressionName(v.Fun); funName == "new" {
 			return findExpressionName(v.Args[0])
 		}
 	case *ast.CompositeLit:
 		return findExpressionName(v.Type)
 	case *ast.UnaryExpr:
 		return findExpressionName(v.X)
+	case *ast.SelectorExpr:
+		if x, ok := v.X.(*ast.Ident); ok {
+			return x.Name, v.Sel.Name
+		}
 	case *ast.Ident:
 		if v.Obj == nil {
-			return v.Name
+			return "", v.Name
 		}
 		if spec, ok := v.Obj.Decl.(*ast.ValueSpec); ok {
 			for _, val := range spec.Values {
-				name := findExpressionName(val)
+				pkgName, name = findExpressionName(val)
 				if name != "" {
-					return name
+					return pkgName, name
 				}
 			}
 		}
 		if assign, ok := v.Obj.Decl.(*ast.AssignStmt); ok {
 			for _, r := range assign.Rhs {
-				name := findExpressionName(r.(ast.Expr))
+				pkgName, name = findExpressionName(r.(ast.Expr))
 				if name != "" {
-					return name
+					return pkgName, name
 				}
 			}
 		}
-		return v.Name
+		return "", v.Name
 	}
-	return ""
+	return "", ""
 }
