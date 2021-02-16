@@ -56,7 +56,7 @@ var _ TestRunner = (*SuiteRunner)(nil)
 
 func NewSuiteRunner(ids string, test *model.TestEntry, timeout time.Duration) *SuiteRunner {
 	pattern := strings.Join(test.Suite.Tests, "|")
-	cmdLine := fmt.Sprintf("go test . -test.timeout %v -count 1 --run \"^(%s)$\\\\z\" --tags \"%s\" --test.v --testify.m=\"%v\"",
+	cmdLine := fmt.Sprintf(`go test . -test.timeout %v -count 1 -json --run "^(%s)$\\z" --tags "%s" --test.v --testify.m="%v"`,
 		timeout, test.Suite.Name, test.Tags, pattern)
 	envMgr := shell.NewEnvironmentManager()
 	_ = envMgr.ProcessEnvironment(ids, "gotest", os.TempDir(), test.ExecutionConfig.Env, map[string]string{})

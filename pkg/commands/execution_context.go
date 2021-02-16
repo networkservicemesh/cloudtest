@@ -47,7 +47,7 @@ import (
 	"github.com/networkservicemesh/cloudtest/pkg/reporting"
 	"github.com/networkservicemesh/cloudtest/pkg/runners"
 	shell_mgr "github.com/networkservicemesh/cloudtest/pkg/shell"
-	suites2 "github.com/networkservicemesh/cloudtest/pkg/suites"
+	"github.com/networkservicemesh/cloudtest/pkg/suites"
 	"github.com/networkservicemesh/cloudtest/pkg/utils"
 )
 
@@ -1487,37 +1487,49 @@ func (ctx *executionContext) findShellTest(exec *config.Execution) []*model.Test
 
 func (ctx *executionContext) findGoTest(executionConfig *config.Execution) ([]*model.TestEntry, error) {
 	st := time.Now()
+
 	logrus.Infof("Starting finding tests by source %v", executionConfig.Source)
+
 	execTests, err := model.GetTestConfiguration(ctx.manager, executionConfig.PackageRoot, executionConfig.Source)
 	if err != nil {
 		logrus.Errorf("Failed during test lookup %v", err)
 		return nil, err
 	}
+
 	result, err := ctx.findGoSuites(executionConfig, execTests)
 	if err != nil {
 		return nil, errors.Wrapf(err, "an error during searching go suites")
 	}
-	logrus.Infof("Tests found: %v Elapsed: %v", len(execTests), time.Since(st))
+
+	testCount := len(execTests)
+	for _, testEntry := range result {
+		testCount += len(testEntry.Suite.Tests)
+	}
+
+	logrus.Infof("Tests found: %v Elapsed: %v", testCount, time.Since(st))
+
 	for _, t := range execTests {
 		t.Kind = model.GoTestKind
 		t.ExecutionConfig = executionConfig
 		if len(executionConfig.OnlyRun) == 0 || utils.Contains(executionConfig.OnlyRun, t.Name) {
 			result = append(result, t)
+		} else {
+			testCount--
 		}
 	}
-	if len(result) != len(execTests) {
-		logrus.Infof("Tests after filtering: %v", len(result))
-	}
+
+	logrus.Infof("Tests after filtering: %v", testCount)
+
 	return result, nil
 }
 
 func (ctx *executionContext) findGoSuites(execution *config.Execution, allTests map[string]*model.TestEntry) ([]*model.TestEntry, error) {
-	suites, err := suites2.Find(execution.PackageRoot)
+	testSuites, err := suites.Find(execution.PackageRoot)
 	if err != nil {
 		return nil, err
 	}
 	var result []*model.TestEntry
-	for _, s := range suites {
+	for _, s := range testSuites {
 		if _, ok := allTests[s.Name]; !ok {
 			continue
 		}
@@ -1668,9 +1680,16 @@ func (ctx *executionContext) generateReportSuiteByTestTasks(suiteName string, te
 	suite := &reporting.Suite{
 		Name: suiteName,
 	}
+
 	for _, test := range tests {
-		testsCount, time, failuresCount = ctx.generateTestCaseReport(test, testsCount, time, failuresCount, suite)
+		switch test.test.Kind {
+		case model.GoTestKind, model.ShellTestKind:
+			testsCount, time, failuresCount = ctx.generateTestCaseReport(test, testsCount, time, failuresCount, suite)
+		case model.SuiteTestKind:
+			testsCount, time, failuresCount = ctx.generateTestSuiteReport(test, testsCount, time, failuresCount, suite)
+		}
 	}
+
 	return testsCount, time, failuresCount, suite
 }
 
@@ -1709,6 +1728,37 @@ func (ctx *executionContext) generateClusterFailedReportEntry(instID string, exe
 		Message:  message,
 	}
 	suite.TestCases = append(suite.TestCases, startCase)
+}
+
+func (ctx *executionContext) generateTestSuiteReport(test *testTask, totalTests int, totalTime time.Duration, failures int, parentSuite *reporting.Suite) (int, time.Duration, int) {
+	suite := &reporting.Suite{
+		Name:  test.test.Suite.Name,
+		Tests: len(test.test.Suite.Tests),
+		Time:  fmt.Sprintf("%v", test.test.Duration.Seconds()),
+	}
+
+	var tests []*model.TestEntry
+	switch test.test.Status {
+	case model.StatusSkipped, model.StatusSkippedSinceNoClusters:
+		tests = suites.SkipSuite(test.test)
+	default:
+		var err error
+		if tests, err = suites.SplitSuite(test.test, ctx.manager, test.clusterTaskID); err != nil {
+			logrus.Fatalf("error: %+v", err)
+		}
+	}
+
+	for _, testEntry := range tests {
+		_, _, suite.Failures = ctx.generateTestCaseReport(&testTask{
+			test:             testEntry,
+			clusters:         test.clusters,
+			clusterInstances: test.clusterInstances,
+			clusterTaskID:    test.clusterTaskID,
+		}, 0, 0, suite.Failures, suite)
+	}
+	parentSuite.Suites = append(parentSuite.Suites, suite)
+
+	return totalTests + suite.Tests, totalTime + test.test.Duration, failures + suite.Failures
 }
 
 func (ctx *executionContext) generateTestCaseReport(test *testTask, totalTests int, totalTime time.Duration, failures int, suite *reporting.Suite) (int, time.Duration, int) {
