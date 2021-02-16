@@ -1673,24 +1673,31 @@ func (ctx *executionContext) generateClusterFailuresReportSuite() (time.Duration
 	return failuresTime, clusterFailures, clusterFailuresSuite
 }
 
-func (ctx *executionContext) generateReportSuiteByTestTasks(suiteName string, tests []*testTask) (int, time.Duration, int, *reporting.Suite) {
-	failuresCount := 0
-	testsCount := 0
-	time := time.Duration(0)
-	suite := &reporting.Suite{
+func (ctx *executionContext) generateReportSuiteByTestTasks(
+	suiteName string,
+	tests []*testTask,
+) (testsCount int, duration time.Duration, failuresCount int, suite *reporting.Suite) {
+	suite = &reporting.Suite{
 		Name: suiteName,
 	}
 
 	for _, test := range tests {
+		var subTestsCount, subFailuresCount int
+		var subDuration time.Duration
+
 		switch test.test.Kind {
 		case model.GoTestKind, model.ShellTestKind:
-			testsCount, time, failuresCount = ctx.generateTestCaseReport(test, testsCount, time, failuresCount, suite)
+			subTestsCount, subDuration, subFailuresCount = ctx.generateTestCaseReport(test, suite)
 		case model.SuiteTestKind:
-			testsCount, time, failuresCount = ctx.generateTestSuiteReport(test, testsCount, time, failuresCount, suite)
+			subTestsCount, subDuration, subFailuresCount = ctx.generateTestSuiteReport(test, suite)
 		}
+
+		testsCount += subTestsCount
+		duration += subDuration
+		failuresCount += subFailuresCount
 	}
 
-	return testsCount, time, failuresCount, suite
+	return testsCount, duration, failuresCount, suite
 }
 
 func (ctx *executionContext) getAllTestTasksGroupedByExecutions() map[string][]*testTask {
@@ -1730,7 +1737,10 @@ func (ctx *executionContext) generateClusterFailedReportEntry(instID string, exe
 	suite.TestCases = append(suite.TestCases, startCase)
 }
 
-func (ctx *executionContext) generateTestSuiteReport(test *testTask, totalTests int, totalTime time.Duration, failures int, parentSuite *reporting.Suite) (int, time.Duration, int) {
+func (ctx *executionContext) generateTestSuiteReport(
+	test *testTask,
+	parentSuite *reporting.Suite,
+) (testsCount int, time time.Duration, failuresCount int) {
 	suite := &reporting.Suite{
 		Name:  test.test.Suite.Name,
 		Tests: len(test.test.Suite.Tests),
@@ -1749,19 +1759,23 @@ func (ctx *executionContext) generateTestSuiteReport(test *testTask, totalTests 
 	}
 
 	for _, testEntry := range tests {
-		_, _, suite.Failures = ctx.generateTestCaseReport(&testTask{
+		_, _, subFailuresCount := ctx.generateTestCaseReport(&testTask{
 			test:             testEntry,
 			clusters:         test.clusters,
 			clusterInstances: test.clusterInstances,
 			clusterTaskID:    test.clusterTaskID,
-		}, 0, 0, suite.Failures, suite)
+		}, suite)
+		suite.Failures += subFailuresCount
 	}
 	parentSuite.Suites = append(parentSuite.Suites, suite)
 
-	return totalTests + suite.Tests, totalTime + test.test.Duration, failures + suite.Failures
+	return suite.Tests, test.test.Duration, suite.Failures
 }
 
-func (ctx *executionContext) generateTestCaseReport(test *testTask, totalTests int, totalTime time.Duration, failures int, suite *reporting.Suite) (int, time.Duration, int) {
+func (ctx *executionContext) generateTestCaseReport(
+	test *testTask,
+	suite *reporting.Suite,
+) (testsCount int, duration time.Duration, failuresCount int) {
 	testCase := &reporting.TestCase{
 		Name:    test.test.Name,
 		Time:    fmt.Sprintf("%v", test.test.Duration.Seconds()),
@@ -1786,7 +1800,7 @@ func (ctx *executionContext) generateTestCaseReport(test *testTask, totalTests i
 			Contents: result.String(),
 			Message:  message,
 		}
-		failures++
+		failuresCount++
 	case model.StatusSkipped:
 		msg := "By limit of number of tests to run"
 		if test.test.SkipMessage != "" {
@@ -1808,12 +1822,12 @@ func (ctx *executionContext) generateTestCaseReport(test *testTask, totalTests i
 				Type:    "ERROR",
 				Message: message,
 			}
-			failures++
+			failuresCount++
 		}
 	}
 	suite.TestCases = append(suite.TestCases, testCase)
 
-	return totalTests + 1, totalTime + test.test.Duration, failures
+	return 1, test.test.Duration, failuresCount
 }
 
 func (ctx *executionContext) hasFailedCluster(task *testTask) bool {
