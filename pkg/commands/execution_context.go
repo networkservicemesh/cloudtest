@@ -1740,7 +1740,7 @@ func (ctx *executionContext) generateClusterFailedReportEntry(instID string, exe
 func (ctx *executionContext) generateTestSuiteReport(
 	test *testTask,
 	parentSuite *reporting.Suite,
-) (testsCount int, time time.Duration, failuresCount int) {
+) (testsCount int, duration time.Duration, failuresCount int) {
 	suite := &reporting.Suite{
 		Name:  test.test.Suite.Name,
 		Tests: len(test.test.Suite.Tests),
