@@ -19,15 +19,13 @@ package tests
 import (
 	"io/ioutil"
 	"os"
-	"path"
-	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/networkservicemesh/cloudtest/pkg/commands"
 	"github.com/networkservicemesh/cloudtest/pkg/config"
+	"github.com/networkservicemesh/cloudtest/pkg/reporting"
 	"github.com/networkservicemesh/cloudtest/pkg/utils"
 )
 
@@ -55,16 +53,20 @@ func TestCloudtestCanWorkWithSuites(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, report)
 
-	const testName = "TestRunSuite"
-
-	provider1SuiteTestCount := getSuiteRunTestsCount(t, path.Join(tmpDir, testConfig.Providers[0].Name+"-1"), testName)
-	provider2SuiteTestCount := getSuiteRunTestsCount(t, path.Join(tmpDir, testConfig.Providers[0].Name+"-2"), testName)
-
-	if provider1SuiteTestCount != 4 && provider2SuiteTestCount != 4 {
-		require.FailNow(t, "one of providers should handle 4 sub-tests")
+	var providerSuite *reporting.Suite
+	for providerSuite = report.Suites[0]; providerSuite.Name != "a_provider"; providerSuite = providerSuite.Suites[0] {
 	}
 
-	require.Equal(t, 4, provider2SuiteTestCount+provider1SuiteTestCount)
+	const testName = "TestRunSuite"
+
+	var providerSuiteTestCount int
+	for _, suite := range providerSuite.Suites {
+		if suite.Name == testName {
+			require.Equal(t, 4, suite.Tests)
+			providerSuiteTestCount += suite.Tests
+		}
+	}
+	require.Equal(t, 4, providerSuiteTestCount)
 }
 
 func TestCloudtestCanWorkWithSuitesSplit(t *testing.T) {
@@ -92,31 +94,18 @@ func TestCloudtestCanWorkWithSuitesSplit(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, report)
 
+	var providerSuite *reporting.Suite
+	for providerSuite = report.Suites[0]; providerSuite.Name != "a_provider"; providerSuite = providerSuite.Suites[0] {
+	}
+
 	const testName = "TestRunSuite"
 
-	provider1SuiteTestCount := getSuiteRunTestsCount(t, path.Join(tmpDir, testConfig.Providers[0].Name+"-1"), testName)
-	provider2SuiteTestCount := getSuiteRunTestsCount(t, path.Join(tmpDir, testConfig.Providers[0].Name+"-2"), testName)
-	require.Equal(t, 2, provider1SuiteTestCount)
-	require.Equal(t, 2, provider2SuiteTestCount)
-}
-
-func getSuiteRunTestsCount(t *testing.T, dir, testName string) int {
-	files, err := ioutil.ReadDir(dir)
-	for _, file := range files {
-		require.NoError(t, err)
-		if strings.Contains(file.Name(), testName) {
-			bytes, err := ioutil.ReadFile(path.Join(dir, file.Name()))
-			require.NoError(t, err)
-			log := string(bytes)
-			require.Equal(t, 1, getPatternMatchCount(log, "SETUP"))
-			require.Equal(t, 1, getPatternMatchCount(log, "TEARDOWN"))
-			return getPatternMatchCount(log, testName)/2 - 2
+	var providerSuiteTestCount int
+	for _, suite := range providerSuite.Suites {
+		if suite.Name == testName {
+			require.Equal(t, 2, suite.Tests)
+			providerSuiteTestCount += suite.Tests
 		}
 	}
-	return 0
-}
-
-func getPatternMatchCount(source, pattern string) int {
-	regexpPattern := regexp.MustCompile(pattern)
-	return len(regexpPattern.FindAllStringIndex(source, -1))
+	require.Equal(t, 4, providerSuiteTestCount)
 }
