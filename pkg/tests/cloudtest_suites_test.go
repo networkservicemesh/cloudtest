@@ -74,13 +74,14 @@ func TestCloudtestCanWorkWithSuites(t *testing.T) {
 
 	for _, suite := range providerSuite.Suites {
 		if result, ok := suiteResults[suite.Name]; ok {
+			result.tests = len(suite.TestCases)
 			for _, testCase := range suite.TestCases {
-				result.tests++
-				if testCase.Failure != nil {
+				switch {
+				case testCase.Failure != nil:
 					result.failed++
-				} else if testCase.SkipMessage != nil {
+				case testCase.SkipMessage != nil:
 					result.skipped++
-				} else {
+				default:
 					result.passed++
 				}
 			}

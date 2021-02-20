@@ -1520,7 +1520,7 @@ func (ctx *executionContext) findGoTest(executionConfig *config.Execution) ([]*m
 	}
 
 	if filteredTestsCount != 0 {
-		logrus.Infof("Tests after filtering: %v", testCount - filteredTestsCount)
+		logrus.Infof("Tests after filtering: %v", testCount-filteredTestsCount)
 	}
 
 	return result, nil
