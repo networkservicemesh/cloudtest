@@ -1508,17 +1508,20 @@ func (ctx *executionContext) findGoTest(executionConfig *config.Execution) ([]*m
 
 	logrus.Infof("Tests found: %v Elapsed: %v", testCount, time.Since(st))
 
+	filteredTestsCount := 0
 	for _, t := range execTests {
 		t.Kind = model.GoTestKind
 		t.ExecutionConfig = executionConfig
 		if len(executionConfig.OnlyRun) == 0 || utils.Contains(executionConfig.OnlyRun, t.Name) {
 			result = append(result, t)
 		} else {
-			testCount--
+			filteredTestsCount++
 		}
 	}
 
-	logrus.Infof("Tests after filtering: %v", testCount)
+	if filteredTestsCount != 0 {
+		logrus.Infof("Tests after filtering: %v", testCount - filteredTestsCount)
+	}
 
 	return result, nil
 }
