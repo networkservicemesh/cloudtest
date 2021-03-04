@@ -50,7 +50,7 @@ func (runner *goTestRunner) GetCmdLine() string {
 
 // NewGoTestRunner - creates go test runner
 func NewGoTestRunner(ids string, test *model.TestEntry, timeout time.Duration) TestRunner {
-	cmdLine := fmt.Sprintf("go test . -test.timeout %v -count 1 --run \"^(%s)$\\\\z\" --tags \"%s\" --test.v",
+	cmdLine := fmt.Sprintf(`go test . -test.timeout %v -count 1 --run "^(%s)$\\z" --tags "%s" --test.v`,
 		timeout, test.Name, test.Tags)
 
 	envMgr := shell.NewEnvironmentManager()

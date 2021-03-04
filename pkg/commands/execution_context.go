@@ -47,7 +47,7 @@ import (
 	"github.com/networkservicemesh/cloudtest/pkg/reporting"
 	"github.com/networkservicemesh/cloudtest/pkg/runners"
 	shell_mgr "github.com/networkservicemesh/cloudtest/pkg/shell"
-	suites2 "github.com/networkservicemesh/cloudtest/pkg/suites"
+	"github.com/networkservicemesh/cloudtest/pkg/suites"
 	"github.com/networkservicemesh/cloudtest/pkg/utils"
 )
 
@@ -1487,37 +1487,52 @@ func (ctx *executionContext) findShellTest(exec *config.Execution) []*model.Test
 
 func (ctx *executionContext) findGoTest(executionConfig *config.Execution) ([]*model.TestEntry, error) {
 	st := time.Now()
+
 	logrus.Infof("Starting finding tests by source %v", executionConfig.Source)
+
 	execTests, err := model.GetTestConfiguration(ctx.manager, executionConfig.PackageRoot, executionConfig.Source)
 	if err != nil {
 		logrus.Errorf("Failed during test lookup %v", err)
 		return nil, err
 	}
+
 	result, err := ctx.findGoSuites(executionConfig, execTests)
 	if err != nil {
 		return nil, errors.Wrapf(err, "an error during searching go suites")
 	}
-	logrus.Infof("Tests found: %v Elapsed: %v", len(execTests), time.Since(st))
+
+	testCount := len(execTests)
+	for _, testEntry := range result {
+		testCount += len(testEntry.Suite.Tests)
+	}
+
+	logrus.Infof("Tests found: %v Elapsed: %v", testCount, time.Since(st))
+
+	filteredTestsCount := 0
 	for _, t := range execTests {
 		t.Kind = model.GoTestKind
 		t.ExecutionConfig = executionConfig
 		if len(executionConfig.OnlyRun) == 0 || utils.Contains(executionConfig.OnlyRun, t.Name) {
 			result = append(result, t)
+		} else {
+			filteredTestsCount++
 		}
 	}
-	if len(result) != len(execTests) {
-		logrus.Infof("Tests after filtering: %v", len(result))
+
+	if filteredTestsCount != 0 {
+		logrus.Infof("Tests after filtering: %v", testCount-filteredTestsCount)
 	}
+
 	return result, nil
 }
 
 func (ctx *executionContext) findGoSuites(execution *config.Execution, allTests map[string]*model.TestEntry) ([]*model.TestEntry, error) {
-	suites, err := suites2.Find(execution.PackageRoot)
+	testSuites, err := suites.Find(execution.PackageRoot)
 	if err != nil {
 		return nil, err
 	}
 	var result []*model.TestEntry
-	for _, s := range suites {
+	for _, s := range testSuites {
 		if _, ok := allTests[s.Name]; !ok {
 			continue
 		}
@@ -1661,17 +1676,31 @@ func (ctx *executionContext) generateClusterFailuresReportSuite() (time.Duration
 	return failuresTime, clusterFailures, clusterFailuresSuite
 }
 
-func (ctx *executionContext) generateReportSuiteByTestTasks(suiteName string, tests []*testTask) (int, time.Duration, int, *reporting.Suite) {
-	failuresCount := 0
-	testsCount := 0
-	time := time.Duration(0)
-	suite := &reporting.Suite{
+func (ctx *executionContext) generateReportSuiteByTestTasks(
+	suiteName string,
+	tests []*testTask,
+) (testsCount int, duration time.Duration, failuresCount int, suite *reporting.Suite) {
+	suite = &reporting.Suite{
 		Name: suiteName,
 	}
+
 	for _, test := range tests {
-		testsCount, time, failuresCount = ctx.generateTestCaseReport(test, testsCount, time, failuresCount, suite)
+		var subTestsCount, subFailuresCount int
+		var subDuration time.Duration
+
+		switch test.test.Kind {
+		case model.GoTestKind, model.ShellTestKind:
+			subTestsCount, subDuration, subFailuresCount = ctx.generateTestCaseReport(test, suite)
+		case model.SuiteTestKind:
+			subTestsCount, subDuration, subFailuresCount = ctx.generateTestSuiteReport(test, suite)
+		}
+
+		testsCount += subTestsCount
+		duration += subDuration
+		failuresCount += subFailuresCount
 	}
-	return testsCount, time, failuresCount, suite
+
+	return testsCount, duration, failuresCount, suite
 }
 
 func (ctx *executionContext) getAllTestTasksGroupedByExecutions() map[string][]*testTask {
@@ -1711,7 +1740,45 @@ func (ctx *executionContext) generateClusterFailedReportEntry(instID string, exe
 	suite.TestCases = append(suite.TestCases, startCase)
 }
 
-func (ctx *executionContext) generateTestCaseReport(test *testTask, totalTests int, totalTime time.Duration, failures int, suite *reporting.Suite) (int, time.Duration, int) {
+func (ctx *executionContext) generateTestSuiteReport(
+	test *testTask,
+	parentSuite *reporting.Suite,
+) (testsCount int, duration time.Duration, failuresCount int) {
+	suite := &reporting.Suite{
+		Name:  test.test.Suite.Name,
+		Tests: len(test.test.Suite.Tests),
+		Time:  fmt.Sprintf("%v", test.test.Duration.Seconds()),
+	}
+
+	var tests []*model.TestEntry
+	switch test.test.Status {
+	case model.StatusSkipped, model.StatusSkippedSinceNoClusters:
+		tests = suites.SkipSuite(test.test)
+	default:
+		var err error
+		if tests, err = suites.SplitSuite(test.test, ctx.manager, test.clusterTaskID); err != nil {
+			logrus.Fatalf("error: %+v", err)
+		}
+	}
+
+	for _, testEntry := range tests {
+		_, _, subFailuresCount := ctx.generateTestCaseReport(&testTask{
+			test:             testEntry,
+			clusters:         test.clusters,
+			clusterInstances: test.clusterInstances,
+			clusterTaskID:    test.clusterTaskID,
+		}, suite)
+		suite.Failures += subFailuresCount
+	}
+	parentSuite.Suites = append(parentSuite.Suites, suite)
+
+	return suite.Tests, test.test.Duration, suite.Failures
+}
+
+func (ctx *executionContext) generateTestCaseReport(
+	test *testTask,
+	suite *reporting.Suite,
+) (testsCount int, duration time.Duration, failuresCount int) {
 	testCase := &reporting.TestCase{
 		Name:    test.test.Name,
 		Time:    fmt.Sprintf("%v", test.test.Duration.Seconds()),
@@ -1736,7 +1803,7 @@ func (ctx *executionContext) generateTestCaseReport(test *testTask, totalTests i
 			Contents: result.String(),
 			Message:  message,
 		}
-		failures++
+		failuresCount++
 	case model.StatusSkipped:
 		msg := "By limit of number of tests to run"
 		if test.test.SkipMessage != "" {
@@ -1758,12 +1825,12 @@ func (ctx *executionContext) generateTestCaseReport(test *testTask, totalTests i
 				Type:    "ERROR",
 				Message: message,
 			}
-			failures++
+			failuresCount++
 		}
 	}
 	suite.TestCases = append(suite.TestCases, testCase)
 
-	return totalTests + 1, totalTime + test.test.Duration, failures
+	return 1, test.test.Duration, failuresCount
 }
 
 func (ctx *executionContext) hasFailedCluster(task *testTask) bool {

@@ -19,25 +19,32 @@ package suites
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 )
 
-type SuiteExample struct {
+type SuiteTimeout struct {
 	suite.Suite
 }
 
-func (s *SuiteExample) TestPass() {
+func (s *SuiteTimeout) TestPass() {
 	logrus.Infof("Passed test:" + os.Getenv("KUBECONFIG"))
 }
 
-func (s *SuiteExample) TestFail() {
+func (s *SuiteTimeout) TestFail() {
 	logrus.Infof("Failed test: " + os.Getenv("KUBECONFIG"))
 
 	s.T().FailNow()
 }
 
-func TestRunSuiteExample(t *testing.T) {
-	suite.Run(t, new(SuiteExample))
+func (s *SuiteTimeout) TestTimeout() {
+	logrus.Infof("Timeout test: " + os.Getenv("KUBECONFIG"))
+
+	<-time.After(10 * time.Second)
+}
+
+func TestRunSuiteTimeout(t *testing.T) {
+	suite.Run(t, new(SuiteTimeout))
 }

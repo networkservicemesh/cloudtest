@@ -17,27 +17,35 @@
 package suites
 
 import (
-	"os"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 )
 
-type SuiteExample struct {
+type SuiteSplit struct {
 	suite.Suite
 }
 
-func (s *SuiteExample) TestPass() {
-	logrus.Infof("Passed test:" + os.Getenv("KUBECONFIG"))
+func (s *SuiteSplit) SetupSuite() {
+	println("SETUP")
 }
 
-func (s *SuiteExample) TestFail() {
-	logrus.Infof("Failed test: " + os.Getenv("KUBECONFIG"))
-
-	s.T().FailNow()
+func (s *SuiteSplit) TearDownSuite() {
+	println("TEARDOWN")
 }
 
-func TestRunSuiteExample(t *testing.T) {
-	suite.Run(t, new(SuiteExample))
+func (s *SuiteSplit) Test1() {
+}
+
+func (s *SuiteSplit) Test2() {
+}
+
+func (s *SuiteSplit) Test3() {
+}
+
+func (s *SuiteSplit) Test4() {
+}
+
+func TestRunSuiteSplit(t *testing.T) {
+	suite.Run(t, new(SuiteSplit))
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2021 Doc.ai and/or its affiliates.
+// Copyright (c) 2021 Doc.ai and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -14,30 +14,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package suites provides tools to work with go test suites
 package suites
-
-import (
-	"os"
-	"testing"
-
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/suite"
-)
-
-type SuiteExample struct {
-	suite.Suite
-}
-
-func (s *SuiteExample) TestPass() {
-	logrus.Infof("Passed test:" + os.Getenv("KUBECONFIG"))
-}
-
-func (s *SuiteExample) TestFail() {
-	logrus.Infof("Failed test: " + os.Getenv("KUBECONFIG"))
-
-	s.T().FailNow()
-}
-
-func TestRunSuiteExample(t *testing.T) {
-	suite.Run(t, new(SuiteExample))
-}

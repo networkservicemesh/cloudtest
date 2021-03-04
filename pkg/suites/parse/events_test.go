@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2021 Doc.ai and/or its affiliates.
+// Copyright (c) 2021 Doc.ai and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -14,30 +14,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package suites
+package parse_test
 
 import (
 	"os"
 	"testing"
 
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
+
+	"github.com/networkservicemesh/cloudtest/pkg/suites/parse"
 )
 
-type SuiteExample struct {
-	suite.Suite
-}
+func TestEvents(t *testing.T) {
+	file, err := os.Open("sample.log")
+	require.NoError(t, err)
 
-func (s *SuiteExample) TestPass() {
-	logrus.Infof("Passed test:" + os.Getenv("KUBECONFIG"))
-}
+	var testEvents []*parse.TestEvent
+	for event := range parse.Events(file) {
+		require.NoError(t, event.Err)
+		testEvents = append(testEvents, event.TestEvent)
+	}
 
-func (s *SuiteExample) TestFail() {
-	logrus.Infof("Failed test: " + os.Getenv("KUBECONFIG"))
-
-	s.T().FailNow()
-}
-
-func TestRunSuiteExample(t *testing.T) {
-	suite.Run(t, new(SuiteExample))
+	require.Len(t, testEvents, 16)
 }

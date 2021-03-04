@@ -59,7 +59,7 @@ type TestEntryExecution struct {
 	Status     Status // Execution status
 }
 
-//TestEntryKind - describes a testing way.
+// TestEntryKind - describes a testing way.
 type TestEntryKind uint8
 
 const (

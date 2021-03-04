@@ -1,0 +1,24 @@
+Starting TestSuite1 on kind-1
+Command line go test . -test.timeout 2m0s -count 1 -json --run "^(TestSuite)$\\z" --tags "" --test.v --testify.m="TestPass|TestFail"
+env==[KUBECONFIG=/Users/user/Projects/NSM/cloudtest/examples/kind/.results/shell/kind-1/config ARTIFACTS_DIR=/Users/user/Projects/NSM/cloudtest/examples/kind/.results/kind-1/TestSuite1] 
+
+Before is empty script. Nothing to run
+{"Time":"2021-02-15T18:49:10.250342+07:00","Action":"run","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Test":"TestSuite"}
+{"Time":"2021-02-15T18:49:10.251649+07:00","Action":"output","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Test":"TestSuite","Output":"=== RUN   TestSuite\n"}
+{"Time":"2021-02-15T18:49:10.25169+07:00","Action":"output","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Test":"TestSuite","Output":"setup\n"}
+{"Time":"2021-02-15T18:49:10.251699+07:00","Action":"run","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Test":"TestSuite/TestFail"}
+{"Time":"2021-02-15T18:49:10.251704+07:00","Action":"output","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Test":"TestSuite/TestFail","Output":"=== RUN   TestSuite/TestFail\n"}
+{"Time":"2021-02-15T18:49:10.251716+07:00","Action":"run","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Test":"TestSuite/TestPass"}
+{"Time":"2021-02-15T18:49:10.25172+07:00","Action":"output","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Test":"TestSuite/TestPass","Output":"=== RUN   TestSuite/TestPass\n"}
+{"Time":"2021-02-15T18:49:10.252023+07:00","Action":"output","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Test":"TestSuite","Output":"--- FAIL: TestSuite (0.00s)\n"}
+{"Time":"2021-02-15T18:49:10.252037+07:00","Action":"output","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Test":"TestSuite/TestFail","Output":"    --- FAIL: TestSuite/TestFail (0.00s)\n"}
+{"Time":"2021-02-15T18:49:10.252046+07:00","Action":"fail","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Test":"TestSuite/TestFail","Elapsed":0}
+{"Time":"2021-02-15T18:49:10.25206+07:00","Action":"output","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Test":"TestSuite/TestPass","Output":"    --- PASS: TestSuite/TestPass (0.00s)\n"}
+{"Time":"2021-02-15T18:49:10.252064+07:00","Action":"pass","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Test":"TestSuite/TestPass","Elapsed":0}
+{"Time":"2021-02-15T18:49:10.252068+07:00","Action":"fail","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Test":"TestSuite","Elapsed":0}
+{"Time":"2021-02-15T18:49:10.252071+07:00","Action":"output","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Output":"FAIL\n"}
+{"Time":"2021-02-15T18:49:10.25212+07:00","Action":"output","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Output":"FAIL\tgithub.com/networkservicemesh/cloudtest/examples/kind/tests\t0.529s\n"}
+{"Time":"2021-02-15T18:49:10.252133+07:00","Action":"fail","Package":"github.com/networkservicemesh/cloudtest/examples/kind/tests","Elapsed":0.53}
+TestSuite1: OnFail: running on fail script operations with KUBECONFIG=/Users/user/Projects/NSM/cloudtest/examples/kind/.results/shell/kind-1/config on cloud kind-1
+Do cleanup on failure # In case of execution failure this script will cleanup after test
+exit status 1

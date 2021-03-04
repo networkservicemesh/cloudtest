@@ -24,20 +24,26 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type SuiteExample struct {
+type SuiteSkipped struct {
 	suite.Suite
 }
 
-func (s *SuiteExample) TestPass() {
+func (s *SuiteSkipped) SetupSuite() {
+	logrus.Infof("Skipped suite:" + os.Getenv("KUBECONFIG"))
+
+	s.T().SkipNow()
+}
+
+func (s *SuiteSkipped) TestPass() {
 	logrus.Infof("Passed test:" + os.Getenv("KUBECONFIG"))
 }
 
-func (s *SuiteExample) TestFail() {
+func (s *SuiteSkipped) TestFail() {
 	logrus.Infof("Failed test: " + os.Getenv("KUBECONFIG"))
 
 	s.T().FailNow()
 }
 
-func TestRunSuiteExample(t *testing.T) {
-	suite.Run(t, new(SuiteExample))
+func TestRunSuiteSkip(t *testing.T) {
+	suite.Run(t, new(SuiteSkipped))
 }

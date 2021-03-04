@@ -1,4 +1,4 @@
-// Copyright (c) 2020 Doc.ai and/or its affiliates.
+// Copyright (c) 2020-2021 Doc.ai and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -19,16 +19,22 @@ package tests
 import (
 	"io/ioutil"
 	"os"
-	"path"
-	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/networkservicemesh/cloudtest/pkg/commands"
 	"github.com/networkservicemesh/cloudtest/pkg/config"
+	"github.com/networkservicemesh/cloudtest/pkg/reporting"
 	"github.com/networkservicemesh/cloudtest/pkg/utils"
+)
+
+const (
+	suiteSplitName   = "TestRunSuiteSplit"
+	suiteExampleName = "TestRunSuiteExample"
+	suiteFailName    = "TestRunSuiteFail"
+	suiteTimeoutName = "TestRunSuiteTimeout"
+	suiteSkipName    = "TestRunSuiteSkip"
 )
 
 func TestCloudtestCanWorkWithSuites(t *testing.T) {
@@ -45,26 +51,56 @@ func TestCloudtestCanWorkWithSuites(t *testing.T) {
 
 	testConfig.Executions = append(testConfig.Executions, &config.Execution{
 		Name:        "simple",
-		Timeout:     15,
+		Timeout:     5,
 		PackageRoot: "./sample/suites",
 	})
 
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
-	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	require.NoError(t, err)
+	report, _ := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
 	require.NotNil(t, report)
 
-	const testName = "TestRunSuite"
-
-	provider1SuiteTestCount := getSuiteRunTestsCount(t, path.Join(tmpDir, testConfig.Providers[0].Name+"-1"), testName)
-	provider2SuiteTestCount := getSuiteRunTestsCount(t, path.Join(tmpDir, testConfig.Providers[0].Name+"-2"), testName)
-
-	if provider1SuiteTestCount != 4 && provider2SuiteTestCount != 4 {
-		require.FailNow(t, "one of providers should handle 4 sub-tests")
+	var providerSuite *reporting.Suite
+	for providerSuite = report.Suites[0]; providerSuite.Name != "a_provider"; providerSuite = providerSuite.Suites[0] {
 	}
 
-	require.Equal(t, 4, provider2SuiteTestCount+provider1SuiteTestCount)
+	suiteResults := map[string]*suiteResult{
+		suiteSplitName:   {},
+		suiteExampleName: {},
+		suiteFailName:    {},
+		suiteTimeoutName: {},
+		suiteSkipName:    {},
+	}
+
+	for _, suite := range providerSuite.Suites {
+		if result, ok := suiteResults[suite.Name]; ok {
+			result.tests = len(suite.TestCases)
+			for _, testCase := range suite.TestCases {
+				switch {
+				case testCase.Failure != nil:
+					result.failed++
+				case testCase.SkipMessage != nil:
+					result.skipped++
+				default:
+					result.passed++
+				}
+			}
+
+			if suite.Name != suiteFailName {
+				require.Equal(t, result.tests, suite.Tests)
+			} else {
+				// SuiteSetup is not a test
+				require.Equal(t, result.tests, suite.Tests+1)
+			}
+			require.Equal(t, result.failed, suite.Failures)
+		}
+	}
+
+	require.Equal(t, newSuiteResult(4, 0, 4, 0), suiteResults[suiteSplitName])
+	require.Equal(t, newSuiteResult(2, 1, 1, 0), suiteResults[suiteExampleName])
+	require.Equal(t, newSuiteResult(3, 1, 0, 2), suiteResults[suiteFailName])
+	require.Equal(t, newSuiteResult(3, 3, 0, 0), suiteResults[suiteTimeoutName])
+	require.Equal(t, newSuiteResult(2, 0, 0, 2), suiteResults[suiteSkipName])
 }
 
 func TestCloudtestCanWorkWithSuitesSplit(t *testing.T) {
@@ -89,34 +125,31 @@ func TestCloudtestCanWorkWithSuitesSplit(t *testing.T) {
 	testConfig.Reporting.JUnitReportFile = JunitReport
 
 	report, err := commands.PerformTesting(testConfig, &TestValidationFactory{}, &commands.Arguments{})
-	require.NoError(t, err)
 	require.NotNil(t, report)
 
-	const testName = "TestRunSuite"
+	var providerSuite *reporting.Suite
+	for providerSuite = report.Suites[0]; providerSuite.Name != "a_provider"; providerSuite = providerSuite.Suites[0] {
+	}
 
-	provider1SuiteTestCount := getSuiteRunTestsCount(t, path.Join(tmpDir, testConfig.Providers[0].Name+"-1"), testName)
-	provider2SuiteTestCount := getSuiteRunTestsCount(t, path.Join(tmpDir, testConfig.Providers[0].Name+"-2"), testName)
-	require.Equal(t, 2, provider1SuiteTestCount)
-	require.Equal(t, 2, provider2SuiteTestCount)
-}
-
-func getSuiteRunTestsCount(t *testing.T, dir, testName string) int {
-	files, err := ioutil.ReadDir(dir)
-	for _, file := range files {
-		require.NoError(t, err)
-		if strings.Contains(file.Name(), testName) {
-			bytes, err := ioutil.ReadFile(path.Join(dir, file.Name()))
-			require.NoError(t, err)
-			log := string(bytes)
-			require.Equal(t, 1, getPatternMatchCount(log, "SETUP"))
-			require.Equal(t, 1, getPatternMatchCount(log, "TEARDOWN"))
-			return getPatternMatchCount(log, testName)/2 - 2
+	var providerSuiteTestCount int
+	for _, suite := range providerSuite.Suites {
+		if suite.Name == suiteSplitName {
+			require.Equal(t, 2, suite.Tests)
+			providerSuiteTestCount += suite.Tests
 		}
 	}
-	return 0
+	require.Equal(t, 4, providerSuiteTestCount)
 }
 
-func getPatternMatchCount(source, pattern string) int {
-	regexpPattern := regexp.MustCompile(pattern)
-	return len(regexpPattern.FindAllStringIndex(source, -1))
+type suiteResult struct {
+	tests, failed, passed, skipped int
+}
+
+func newSuiteResult(tests, failed, passed, skipped int) *suiteResult {
+	return &suiteResult{
+		tests:   tests,
+		failed:  failed,
+		passed:  passed,
+		skipped: skipped,
+	}
 }

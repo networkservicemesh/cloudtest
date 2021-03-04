@@ -31,7 +31,7 @@ executions:
     env:
       - MY_ENV_VAR="test"   # Put sample environment variable.
     root: ./tests           # A root where to find tests
-    timeout: 60             # Timeout for execution configuration
+    timeout: 10             # Timeout for execution configuration
     cluster-count: 1        # A number of clusters requires for this execution.
     cluster-env:
       - KUBECONFIG          # A name of cluster configuration variable to be passed with name.
@@ -41,7 +41,7 @@ executions:
     env:
       - MY_ENV_VAR="test"   # Put sample environment variable.
     kind: shell             # Define execution with shell script.
-    timeout: 60             # Timeout for execution configuration
+    timeout: 10             # Timeout for execution configuration
     cluster-count: 1        # A number of clusters requires for this execution.
     run: |
       echo "Sample shell command"

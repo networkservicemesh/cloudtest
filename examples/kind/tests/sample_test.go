@@ -22,7 +22,50 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/suite"
 )
+
+type Suite struct {
+	suite.Suite
+}
+
+func (s *Suite) TestPass() {
+	logrus.Infof("Passed test:" + os.Getenv("KUBECONFIG"))
+}
+
+func (s *Suite) TestFail() {
+	logrus.Infof("Failed test: " + os.Getenv("KUBECONFIG"))
+
+	s.T().FailNow()
+}
+
+type FailedSuite struct {
+	suite.Suite
+}
+
+func (s *FailedSuite) SetupSuite() {
+	logrus.Infof("Failed suite: " + os.Getenv("KUBECONFIG"))
+
+	s.T().FailNow()
+}
+
+func (s *FailedSuite) TestPass() {
+	logrus.Infof("Passed test:" + os.Getenv("KUBECONFIG"))
+}
+
+func (s *FailedSuite) TestFail() {
+	logrus.Infof("Failed test: " + os.Getenv("KUBECONFIG"))
+
+	s.T().FailNow()
+}
+
+func TestSuite(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func TestFailedSuite(t *testing.T) {
+	suite.Run(t, new(FailedSuite))
+}
 
 func TestPass(t *testing.T) {
 	logrus.Infof("Passed test:" + os.Getenv("KUBECONFIG"))
@@ -35,6 +78,6 @@ func TestFail(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	logrus.Infof("test timeout for 5 seconds:" + os.Getenv("KUBECONFIG"))
-	<-time.After(5 * time.Second)
+	logrus.Infof("test timeout for 10 seconds:" + os.Getenv("KUBECONFIG"))
+	<-time.After(20 * time.Second)
 }
