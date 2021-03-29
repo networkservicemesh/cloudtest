@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020 Cisco and/or its affiliates.
+// Copyright (c) 2019-2021 Cisco and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -77,8 +78,8 @@ func TestAfterWorksCorrectly(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, report)
 
-	path := path.Join(tmpDir, provider.Name+"-1", "007-test2-run.log")
-	content, err := ioutil.ReadFile(path)
+	p := path.Join(tmpDir, provider.Name+"-1", "008-test2-run.log")
+	content, err := ioutil.ReadFile(filepath.Clean(p))
 	require.NoError(t, err)
 	require.Contains(t, string(content), "After worked")
 }
@@ -131,8 +132,8 @@ func TestBeforeWorksCorrectly(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, report)
 
-	path := path.Join(tmpDir, provider.Name+"-1", "006-test1-run.log")
-	content, err := ioutil.ReadFile(path)
+	p := path.Join(tmpDir, provider.Name+"-1", "007-test1-run.log")
+	content, err := ioutil.ReadFile(filepath.Clean(p))
 	require.NoError(t, err)
 	require.Contains(t, string(content), "Before worked")
 }

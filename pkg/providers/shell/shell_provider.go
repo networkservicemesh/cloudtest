@@ -217,7 +217,7 @@ func (si *shellInstance) doInstall(context context.Context) (string, error) {
 }
 
 func selectZone(ctx context.Context, shellInterface shell.Manager, zoneSelectorScript []string) (string, error) {
-	if len(zoneSelectorScript) > 0 {
+	if len(zoneSelectorScript) == 0 {
 		return "", nil
 	}
 
