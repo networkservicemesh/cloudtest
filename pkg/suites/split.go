@@ -97,9 +97,7 @@ func splitExecutions(suite *model.TestEntry, builders map[string]*testentry.Buil
 
 			var testName string
 			switch {
-			case event.Test == "":
-				continue
-			case strings.HasPrefix(suite.Name, event.Test):
+			case event.Test == "" || strings.HasPrefix(suite.Name, event.Test):
 				testName = setupSuite
 			default:
 				testName = event.TestName()

@@ -96,8 +96,11 @@ func (b *Builder) ProcessFailEvent(testEvent *parse.TestEvent) error {
 
 // ProcessOutputEvent processes "output" parse.TestEvent
 func (b *Builder) ProcessOutputEvent(testEvent *parse.TestEvent) error {
-	_, err := b.file.WriteString(testEvent.Output)
-	return err
+	if b.file != nil {
+		_, err := b.file.WriteString(testEvent.Output)
+		return err
+	}
+	return nil
 }
 
 // ProcessSkipEvent processes "skip" parse.TestEvent

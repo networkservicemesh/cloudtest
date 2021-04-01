@@ -33,6 +33,7 @@ const (
 	suiteSplitName   = "TestRunSuiteSplit"
 	suiteExampleName = "TestRunSuiteExample"
 	suiteFailName    = "TestRunSuiteFail"
+	suiteFatalName   = "TestRunSuiteFatal"
 	suiteTimeoutName = "TestRunSuiteTimeout"
 	suiteSkipName    = "TestRunSuiteSkip"
 )
@@ -68,6 +69,7 @@ func TestCloudtestCanWorkWithSuites(t *testing.T) {
 		suiteSplitName:   {},
 		suiteExampleName: {},
 		suiteFailName:    {},
+		suiteFatalName:   {},
 		suiteTimeoutName: {},
 		suiteSkipName:    {},
 	}
@@ -86,7 +88,7 @@ func TestCloudtestCanWorkWithSuites(t *testing.T) {
 				}
 			}
 
-			if suite.Name != suiteFailName {
+			if suite.Name != suiteFailName && suite.Name != suiteFatalName {
 				require.Equal(t, result.tests, suite.Tests)
 			} else {
 				// SuiteSetup is not a test
@@ -99,6 +101,7 @@ func TestCloudtestCanWorkWithSuites(t *testing.T) {
 	require.Equal(t, newSuiteResult(4, 0, 4, 0), suiteResults[suiteSplitName])
 	require.Equal(t, newSuiteResult(2, 1, 1, 0), suiteResults[suiteExampleName])
 	require.Equal(t, newSuiteResult(3, 1, 0, 2), suiteResults[suiteFailName])
+	require.Equal(t, newSuiteResult(3, 1, 0, 2), suiteResults[suiteFatalName])
 	require.Equal(t, newSuiteResult(3, 3, 0, 0), suiteResults[suiteTimeoutName])
 	require.Equal(t, newSuiteResult(2, 0, 0, 2), suiteResults[suiteSkipName])
 }
