@@ -1,4 +1,6 @@
-// Copyright (c) 2019-2020 Cisco Systems, Inc and/or its affiliates.
+// Copyright (c) 2021 Doc.ai and/or its affiliates.
+//
+// Copyright (c) 2019-2021 Cisco Systems, Inc and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -16,25 +18,12 @@
 
 package config
 
-const (
-	Layer3 NetworkType = "layer3"
-	Layer2 NetworkType = "layer2-individual"
-	Mixed  NetworkType = "hybrid"
-)
-
-type NetworkType string
-
-type NetworkConfig struct {
-	Type      NetworkType    `yaml:"type"`
-	PortVLANs map[string]int `yaml:"port-vlans"` // Port -> VLAN mapping for Layer2, Mixed network type
-}
-
 type HardwareDeviceConfig struct {
 	HostName        string         `yaml:"host-name"` // Host name with variable substitutions supported.
 	OperatingSystem string         `yaml:"os"`        // Operating system
 	Name            string         `yaml:"name"`      // Host name prefix, will create ENV variable IP_HostName
 	BillingCycle    string         `yaml:"billing-cycle"`
-	Network         *NetworkConfig `yaml:"network"`
+	PortVLANs       map[string]int `yaml:"port-vlans"`
 }
 
 type FacilityDeviceConfig struct {
