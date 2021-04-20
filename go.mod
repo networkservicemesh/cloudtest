@@ -6,7 +6,7 @@ require (
 	github.com/antonfisher/nested-logrus-formatter v1.3.0
 	github.com/edwarnicke/exechelper v1.0.1
 	github.com/google/uuid v1.1.1
-	github.com/packethost/packngo v0.5.0
+	github.com/packethost/packngo v0.13.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v1.0.0

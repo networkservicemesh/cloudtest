@@ -1,4 +1,6 @@
-// Copyright (c) 2019 Cisco Systems, Inc and/or its affiliates.
+// Copyright (c) 2021 Doc.ai and/or its affiliates.
+//
+// Copyright (c) 2019-2021 Cisco Systems, Inc and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -179,7 +181,7 @@ func (pi *packetInstance) Start(timeout time.Duration) (string, error) {
 	}
 	pi.virtualNetworkList = virtualNetworks.VirtualNetworks
 
-	netCfgs := map[string]*config.NetworkConfig{}
+	portsVLANs := make(map[string]map[string]int)
 
 	if pi.hardwareReservationsList, err = pi.findHardwareReservations(); err != nil {
 		return "", err
@@ -191,8 +193,8 @@ func (pi *packetInstance) Start(timeout time.Duration) (string, error) {
 		}
 		pi.devices[devCfg.Name] = devID
 
-		if devCfg.Network != nil {
-			netCfgs[devCfg.Name] = devCfg.Network
+		if devCfg.PortVLANs != nil {
+			portsVLANs[devCfg.Name] = devCfg.PortVLANs
 		}
 	}
 
@@ -206,8 +208,8 @@ func (pi *packetInstance) Start(timeout time.Duration) (string, error) {
 		}
 		pi.devices[devCfg.Name] = devID
 
-		if devCfg.Network != nil {
-			netCfgs[devCfg.Name] = devCfg.Network
+		if len(devCfg.PortVLANs) != 0 {
+			portsVLANs[devCfg.Name] = devCfg.PortVLANs
 		}
 	}
 
@@ -216,9 +218,9 @@ func (pi *packetInstance) Start(timeout time.Duration) (string, error) {
 		return "", err
 	}
 
-	// Setup network
-	for key, netCfg := range netCfgs {
-		err = pi.setupDeviceNetwork(key, netCfg)
+	// Setup ports
+	for key, portVLANs := range portsVLANs {
+		err = pi.setupDevicePorts(key, portVLANs)
 		if err != nil {
 			return "", err
 		}
@@ -430,7 +432,7 @@ func (pi *packetInstance) createRequest(devCfg *config.HardwareDeviceConfig) (*p
 	}, err
 }
 
-func (pi *packetInstance) setupDeviceNetwork(key string, netCfg *config.NetworkConfig) error {
+func (pi *packetInstance) setupDevicePorts(key string, portVLANs map[string]int) error {
 	_, file, err := pi.manager.OpenFile(pi.id, "setup-device-network")
 	if err != nil {
 		return err
@@ -444,36 +446,34 @@ func (pi *packetInstance) setupDeviceNetwork(key string, netCfg *config.NetworkC
 		}
 	}()
 
-	log.Printf("device to network type: %v -> %v\n", key, netCfg.Type)
-	device, err := pi.client.DevicePorts.DeviceToNetworkType(pi.devices[key], string(netCfg.Type))
-	if err != nil {
-		return err
-	}
-
-	for portName, vlanTag := range netCfg.PortVLANs {
+	var device *packngo.Device
+	for portName, vlanTag := range portVLANs {
 		log.Printf("port to vlan: %v -> %v\n", portName, vlanTag)
 
-		var port *packngo.Port
-		port, err = pi.client.DevicePorts.GetPortByName(device.ID, portName)
-		if err != nil {
+		if device, _, err = pi.client.Devices.Get(pi.devices[key], getOptions()); err != nil {
 			return err
+		}
+
+		var port *packngo.Port
+		if port, err = device.GetPortByName(portName); err != nil {
+			return err
+		}
+
+		if port.Data.Bonded {
+			if _, _, err = pi.client.Ports.Disbond(port.ID, true); err != nil {
+				return err
+			}
 		}
 
 		var vlan *packngo.VirtualNetwork
-		vlan, err = pi.findVlan(vlanTag)
-		if err != nil {
+		if vlan, err = pi.findVlan(vlanTag); err != nil {
 			return err
 		}
 
-		_, _, err = pi.client.DevicePorts.Assign(&packngo.PortAssignRequest{
-			PortID:           port.ID,
-			VirtualNetworkID: vlan.ID,
-		})
-		if err != nil {
+		if _, _, err = pi.client.Ports.Assign(port.ID, vlan.ID); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
