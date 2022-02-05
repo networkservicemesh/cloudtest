@@ -15,7 +15,7 @@
 ## CloudTest
 
 CloudTest is automatic tool to perform integration testing for cloud based environments, 
-it allow to configure and bring few multiple clouds to live and execurte go/shell integration tests agains all of clusters 
+it allow to configure and bring few multiple clouds to live and execute go/shell integration tests agains all of clusters 
 configured and combine all results into one junit.xml report file to be used with any suitable CI system. 
 
 For more information, have a look at our detailed overview of NSM - [What is CloudTest?](/docs/README.md)
